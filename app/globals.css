@@ -90,6 +90,93 @@ a {
     linear-gradient(180deg, #20304b 0%, #18233a 58%, #314663 58%, #314663 100%);
 }
 
+.campus-map {
+  position: relative;
+  overflow: hidden;
+  height: 270px;
+  border: 4px solid rgba(246, 231, 200, 0.35);
+  background:
+    radial-gradient(circle at 20% 20%, rgba(145, 200, 232, 0.18), transparent 18%),
+    linear-gradient(180deg, #2d4467 0%, #29405f 100%);
+}
+
+.campus-map::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+  background-size: 22px 22px;
+}
+
+.campus-path {
+  position: absolute;
+  background: #c8b68c;
+  box-shadow: 0 0 0 4px rgba(93, 96, 113, 0.55);
+}
+
+.campus-path-one {
+  top: 34%;
+  left: 18%;
+  width: 56%;
+  height: 12px;
+}
+
+.campus-path-two {
+  top: 34%;
+  left: 52%;
+  width: 12px;
+  height: 46%;
+}
+
+.campus-lake {
+  position: absolute;
+  right: 8%;
+  bottom: 10%;
+  width: 26%;
+  height: 24%;
+  background: #76b8a7;
+  box-shadow: 0 0 0 4px rgba(118, 184, 167, 0.28);
+}
+
+.campus-pin {
+  position: absolute;
+  z-index: 1;
+  transform: translate(-50%, -50%);
+}
+
+.campus-pin-dot {
+  display: block;
+  width: 18px;
+  height: 18px;
+  background: #f6e7c8;
+  box-shadow: 0 0 0 4px #1a1e30;
+  opacity: 0.45;
+}
+
+.campus-pin-label {
+  display: inline-block;
+  margin-top: 8px;
+  margin-left: -8px;
+  background: rgba(26, 30, 48, 0.86);
+  padding: 4px 8px;
+  color: #fdf6e3;
+  font-size: 1.45rem;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.campus-pin.is-visited .campus-pin-dot {
+  background: #e0b35a;
+  opacity: 1;
+}
+
+.campus-pin.is-active .campus-pin-dot {
+  background: #e9785f;
+  animation: pulse-pin 1.1s steps(2) infinite;
+}
+
 .pixel-moon {
   position: absolute;
   top: 24px;
@@ -356,6 +443,15 @@ a {
   }
   50% {
     transform: translateY(-4px);
+  }
+}
+
+@keyframes pulse-pin {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.2);
   }
 }
 

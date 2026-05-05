@@ -4,14 +4,27 @@ import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import clsx from "clsx";
 import { SignInButton, SignUpButton, SignedIn, SignedOut, UserButton, useUser } from "@clerk/nextjs";
-import { DEFAULT_STATS, semesterFocuses, semesterScenes } from "@/lib/game/data";
-import { SaveData, SceneChoice, SceneDefinition, Stats } from "@/lib/game/types";
+import {
+  DEFAULT_STATS,
+  relationshipLabels,
+  semesterDefinitions,
+  semesterFocuses
+} from "@/lib/game/data";
+import { RelationshipKey, SaveData, SceneChoice, SceneDefinition, Stats } from "@/lib/game/types";
 import {
   applyEffects,
+  applyRelationshipEffects,
   buildReflection,
+  buildSemesterAdvance,
   createNewSave,
+  describeRelationships,
+  getNextSemesterId,
   getSaveStorageKey,
-  getSceneByIndex,
+  getSceneFromPlan,
+  getSemesterDefinition,
+  getSemesterScenePlan,
+  getVisitedLocationIds,
+  normalizeSave,
   summarizeSemester
 } from "@/lib/game/utils";
 
@@ -26,6 +39,13 @@ const statColors: Record<keyof Stats, string> = {
   social: "bg-coral",
   mental: "bg-teal",
   finances: "bg-gold"
+};
+
+const relationshipColors: Record<RelationshipKey, string> = {
+  professorAlden: "bg-gold",
+  mina: "bg-coral",
+  homeFriends: "bg-sky",
+  derek: "bg-teal"
 };
 
 function StatMeter({ label, value, color }: { label: string; value: number; color: string }) {
@@ -92,6 +112,28 @@ function SceneChoiceCard({
   );
 }
 
+function RelationshipMeter({
+  label,
+  value,
+  color
+}: {
+  label: string;
+  value: number;
+  color: string;
+}) {
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between text-xl uppercase tracking-[0.18em] text-parchment">
+        <span>{label}</span>
+        <span>{value}</span>
+      </div>
+      <div className="h-4 border-2 border-ink bg-ink/60">
+        <div className={clsx("h-full transition-all duration-500", color)} style={{ width: `${value}%` }} />
+      </div>
+    </div>
+  );
+}
+
 function PixelDormAnimation() {
   return (
     <section className="pixel-panel overflow-hidden bg-[#243451] p-5 text-parchment">
@@ -99,7 +141,7 @@ function PixelDormAnimation() {
         <div>
           <p className="font-display text-xs uppercase leading-relaxed text-sky">Little campus loop</p>
           <p className="mt-3 text-2xl leading-6 text-parchment/90">
-            A tiny version of your freshman self wandering home after a long day.
+            A tiny version of your player sprite wandering home after a long day.
           </p>
         </div>
         <div className="rounded-none border-2 border-parchment/40 bg-[#172238] px-3 py-2 text-xl uppercase tracking-[0.18em] text-gold">
@@ -145,6 +187,54 @@ function PixelDormAnimation() {
   );
 }
 
+function CampusMap({ visited, activeLocationId }: { visited: Set<string>; activeLocationId?: string }) {
+  const locations = [
+    { id: "campus-gate", label: "Campus Gate", top: "12%", left: "20%" },
+    { id: "humanities", label: "Humanities Hall", top: "28%", left: "60%" },
+    { id: "north-dorm", label: "North Dorm", top: "54%", left: "24%" },
+    { id: "student-center", label: "Student Center", top: "68%", left: "64%" },
+    { id: "library", label: "Library", top: "48%", left: "78%" },
+    { id: "student-union", label: "Student Union", top: "24%", left: "80%" },
+    { id: "residence-room", label: "Dorm Room", top: "80%", left: "28%" },
+    { id: "lake-path", label: "Lake Path", top: "84%", left: "42%" }
+  ];
+
+  return (
+    <section className="pixel-panel bg-[#22314f] p-5 text-parchment">
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <p className="font-display text-xs uppercase leading-relaxed text-sky">Campus map</p>
+          <p className="mt-3 text-2xl leading-6 text-parchment/90">Track the corners of campus that shaped this semester.</p>
+        </div>
+        <div className="rounded-none border-2 border-parchment/40 bg-[#172238] px-3 py-2 text-xl uppercase tracking-[0.18em] text-gold">
+          {visited.size} stops
+        </div>
+      </div>
+
+      <div className="campus-map mt-5">
+        <div className="campus-path campus-path-one" />
+        <div className="campus-path campus-path-two" />
+        <div className="campus-lake" />
+        {locations.map((location) => {
+          const isVisited = visited.has(location.id);
+          const isActive = activeLocationId === location.id;
+
+          return (
+            <div
+              key={location.id}
+              className={clsx("campus-pin", isVisited && "is-visited", isActive && "is-active")}
+              style={{ top: location.top, left: location.left }}
+            >
+              <span className="campus-pin-dot" />
+              <span className="campus-pin-label">{location.label}</span>
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
 function getPlayerName(user: ReturnType<typeof useUser>["user"]) {
   if (!user) {
     return "Freshman";
@@ -181,7 +271,7 @@ export function GameShell() {
 
     if (rawSave) {
       try {
-        setSave(JSON.parse(rawSave) as SaveData);
+        setSave(normalizeSave(JSON.parse(rawSave) as SaveData));
       } catch {
         window.localStorage.removeItem(storageKey);
       }
@@ -196,8 +286,9 @@ export function GameShell() {
 
       const result = (await response.json()) as { save: SaveData | null };
       if (result.save) {
-        setSave(result.save);
-        window.localStorage.setItem(storageKey, JSON.stringify(result.save));
+        const normalized = normalizeSave(result.save);
+        setSave(normalized);
+        window.localStorage.setItem(storageKey, JSON.stringify(normalized));
         setSyncMessage("Supabase save loaded.");
       } else if (rawSave) {
         setSyncMessage("Loaded local save. Remote slot is still empty.");
@@ -236,17 +327,21 @@ export function GameShell() {
     void persist();
   }, [save, user]);
 
-  const currentScene = useMemo(() => (save ? getSceneByIndex(save.sceneIndex) : null), [save]);
+  const semester = useMemo(() => (save ? getSemesterDefinition(save.currentSemesterId) : semesterDefinitions["freshman-fall"]), [save]);
+  const scenePlan = useMemo(() => (save ? getSemesterScenePlan(save) : []), [save]);
+  const currentScene = useMemo(() => (save ? getSceneFromPlan(save, save.sceneIndex) : null), [save]);
+  const visitedLocationIds = useMemo(() => (save ? getVisitedLocationIds(save) : new Set<string>()), [save]);
+  const nextSemesterId = useMemo(() => (save ? getNextSemesterId(save.currentSemesterId) : null), [save]);
 
   const previewStats = useMemo(() => {
-    if (!save || save.focusIds.length === 0) {
+    if (!save) {
       return DEFAULT_STATS;
     }
 
     return save.focusIds.reduce((acc, focusId) => {
       const focus = semesterFocuses.find((entry) => entry.id === focusId);
       return focus ? applyEffects(acc, focus.statEffects) : acc;
-    }, { ...DEFAULT_STATS });
+    }, { ...save.stats });
   }, [save]);
 
   const startGame = () => {
@@ -299,7 +394,7 @@ export function GameShell() {
     const stats = save.focusIds.reduce((acc, focusId) => {
       const focus = semesterFocuses.find((entry) => entry.id === focusId);
       return focus ? applyEffects(acc, focus.statEffects) : acc;
-    }, { ...DEFAULT_STATS });
+    }, { ...save.stats });
 
     const selectedText = save.focusIds
       .map((focusId) => semesterFocuses.find((entry) => entry.id === focusId)?.flavor)
@@ -326,6 +421,7 @@ export function GameShell() {
     }
 
     const nextStats = applyEffects(save.stats, choice.statEffects);
+    const nextRelationships = applyRelationshipEffects(save.relationships, choice.relationshipEffects);
     setFlavor((current) => ({ ...current, loading: true }));
 
     const response = await fetch("/api/flavor", {
@@ -337,7 +433,7 @@ export function GameShell() {
         playerName: save.playerName,
         character: scene.character,
         sceneTitle: scene.title,
-        sceneSummary: scene.summary,
+        sceneSummary: `${scene.summary} Relationships: ${describeRelationships(nextRelationships)}.`,
         promptSeed: scene.promptSeed,
         nextFlavorPrompt: choice.nextFlavorPrompt,
         stats: nextStats
@@ -346,15 +442,16 @@ export function GameShell() {
 
     const result = (await response.json()) as { dialogue: string; provider: string };
     const nextSceneIndex = save.sceneIndex + 1;
-    const nextStep = nextSceneIndex >= semesterScenes.length ? "reflection" : "scene";
+    const nextStep = nextSceneIndex >= scenePlan.length ? "reflection" : "scene";
 
     setSave({
       ...save,
       stats: nextStats,
+      relationships: nextRelationships,
       sceneIndex: nextSceneIndex,
       step: nextStep,
       choiceHistory: [...save.choiceHistory, { sceneId: scene.id, choiceId: choice.id }],
-      reflection: nextStep === "reflection" ? buildReflection({ ...save, stats: nextStats }) : "",
+      reflection: nextStep === "reflection" ? buildReflection({ ...save, stats: nextStats, relationships: nextRelationships }) : "",
       updatedAt: new Date().toISOString()
     });
     setFlavor({
@@ -376,13 +473,32 @@ export function GameShell() {
     });
   };
 
+  const advanceSemester = () => {
+    if (!save) {
+      return;
+    }
+
+    const advanced = buildSemesterAdvance(save);
+    if (!advanced) {
+      return;
+    }
+
+    setSave(advanced);
+    const nextSemester = getSemesterDefinition(advanced.currentSemesterId);
+    setFlavor({
+      text: `${save.playerName} returns for ${nextSemester.title.toLowerCase()}. They know the campus better now, but the people in it have become harder to read.`,
+      provider: "fallback",
+      loading: false
+    });
+  };
+
   const restart = () => {
     if (user) {
       window.localStorage.removeItem(getSaveStorageKey(user.id));
     }
     setSave(null);
     setFlavor({
-      text: "A different first semester is waiting if you want to see it.",
+      text: "A different college version of you is waiting if you want to see it.",
       provider: "fallback",
       loading: false
     });
@@ -400,8 +516,8 @@ export function GameShell() {
           <div className="relative min-h-[720px] p-5 sm:p-7">
             <div className="flex flex-wrap items-center justify-between gap-4 border-b-4 border-parchment/50 pb-4">
               <div>
-                <p className="font-display text-[10px] uppercase leading-relaxed text-sky sm:text-xs">Four Years</p>
-                <h1 className="mt-3 text-4xl uppercase tracking-[0.12em] text-parchment sm:text-6xl">Freshman Fall</h1>
+                <p className="font-display text-[10px] uppercase leading-relaxed text-sky sm:text-xs">{semester.badge}</p>
+                <h1 className="mt-3 text-4xl uppercase tracking-[0.12em] text-parchment sm:text-6xl">{semester.title}</h1>
               </div>
               <div className="flex items-start gap-3">
                 <div className="bg-parchment px-4 py-3 text-right text-ink">
@@ -421,7 +537,7 @@ export function GameShell() {
                 <div className="space-y-5 bg-ink/50 p-5">
                   <p className="font-display text-xs uppercase leading-relaxed text-gold">Authentication</p>
                   <p className="text-3xl leading-8 text-parchment sm:text-4xl sm:leading-10">
-                    Sign in to give each player their own freshman fall, synced across devices and protected by Supabase row-level security.
+                    Sign in to keep your stats, relationships, and semester history attached to your account across the whole college arc.
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-4">
@@ -443,9 +559,9 @@ export function GameShell() {
               {!save && (
                 <div className="mt-8 space-y-6">
                   <div className="space-y-5 bg-ink/50 p-5">
-                    <p className="font-display text-xs uppercase leading-relaxed text-gold">Arrive at campus</p>
+                    <p className="font-display text-xs uppercase leading-relaxed text-gold">Begin the story</p>
                     <p className="text-3xl leading-8 text-parchment sm:text-4xl sm:leading-10">
-                      Boxes stacked by the door. A stranger humming in the next room. The first semester begins before you feel ready.
+                      Freshman year starts with uncertainty, and the version of you that survives it will be shaped one semester at a time.
                     </p>
                   </div>
                   <button
@@ -455,21 +571,19 @@ export function GameShell() {
                   >
                     Start the Semester
                   </button>
-                  <p className="text-2xl text-parchment/80">This save will belong to {getPlayerName(user)} and sync to your Supabase project.</p>
+                  <p className="text-2xl text-parchment/80">This save will belong to {getPlayerName(user)} and carry forward across future semesters.</p>
                 </div>
               )}
 
               {save?.step === "arrival" && (
                 <div className="mt-8 space-y-6">
                   <div className="relative overflow-hidden border-4 border-parchment/60 bg-[#253759]">
-                    <Image src="/backgrounds/campus-arrival.svg" alt="Campus arrival" width={1200} height={800} className="h-[320px] w-full object-cover" />
+                    <Image src="/backgrounds/campus-arrival.svg" alt={semester.arrivalTitle} width={1200} height={800} className="h-[320px] w-full object-cover" />
                   </div>
                   <div className="space-y-4 bg-ink/55 p-5">
-                    <p className="font-display text-xs uppercase leading-relaxed text-gold">Move-in day</p>
-                    <p className="text-3xl leading-8 text-parchment sm:text-4xl sm:leading-10">
-                      {save.playerName}, the campus keeps introducing itself in fragments: cart wheels on brick, parents pretending not to worry, RA flyers taped a little crooked.
-                    </p>
-                    <p className="text-2xl text-parchment/85">Tonight, you get to decide what kind of semester this becomes.</p>
+                    <p className="font-display text-xs uppercase leading-relaxed text-gold">{semester.arrivalTitle}</p>
+                    <p className="text-3xl leading-8 text-parchment sm:text-4xl sm:leading-10">{semester.arrivalCopy}</p>
+                    <p className="text-2xl text-parchment/85">{save.playerName}, this semester already knows what you carried out of the last one.</p>
                   </div>
                   <button
                     type="button"
@@ -485,9 +599,7 @@ export function GameShell() {
                 <div className="mt-8 space-y-6">
                   <div className="space-y-3 bg-ink/55 p-5">
                     <p className="font-display text-xs uppercase leading-relaxed text-sky">Planner</p>
-                    <p className="text-3xl leading-8 text-parchment sm:text-4xl sm:leading-10">
-                      Choose exactly three priorities. This is not about perfection. It is about what gets your time when everything suddenly matters at once.
-                    </p>
+                    <p className="text-3xl leading-8 text-parchment sm:text-4xl sm:leading-10">{semester.plannerPrompt}</p>
                   </div>
                   <div className="grid gap-4 md:grid-cols-2">
                     {semesterFocuses.map((focus) => (
@@ -525,6 +637,7 @@ export function GameShell() {
                     </div>
                   </div>
                   <div className="space-y-4 bg-ink/55 p-5">
+                    <p className="font-display text-xs uppercase leading-relaxed text-gold">{currentScene.locationLabel}</p>
                     <p className="text-3xl leading-8 text-parchment sm:text-4xl sm:leading-10">{currentScene.setting}</p>
                     <p className="text-2xl text-parchment/85">{currentScene.summary}</p>
                   </div>
@@ -542,7 +655,7 @@ export function GameShell() {
                     <Image src="/backgrounds/reflection-walk.svg" alt="Reflection walk" width={1200} height={800} className="h-[320px] w-full object-cover" />
                   </div>
                   <div className="space-y-4 bg-ink/55 p-5">
-                    <p className="font-display text-xs uppercase leading-relaxed text-gold">Year one, chapter one</p>
+                    <p className="font-display text-xs uppercase leading-relaxed text-gold">{semester.reflectionPrompt}</p>
                     <p className="text-3xl leading-8 text-parchment sm:text-4xl sm:leading-10">{save.reflection}</p>
                   </div>
                   <button
@@ -561,16 +674,27 @@ export function GameShell() {
                     <p className="font-display text-xs uppercase leading-relaxed text-sky">Semester complete</p>
                     <p className="text-3xl leading-8 text-parchment sm:text-4xl sm:leading-10">{summarizeSemester(save)}</p>
                     <p className="text-2xl text-parchment/85">
-                      A second player can make different planner choices, handle Professor Alden and Mina differently, and end this semester carrying a very different emotional shape.
+                      Relationship totals now read {describeRelationships(save.relationships)}. Future semesters can open or close depending on what you built here.
                     </p>
                   </div>
-                  <button
-                    type="button"
-                    onClick={restart}
-                    className="pixel-button rounded-none bg-coral px-6 py-4 font-display text-xs uppercase text-ink"
-                  >
-                    Play a Different Semester
-                  </button>
+                  <div className="flex flex-wrap gap-4">
+                    {nextSemesterId ? (
+                      <button
+                        type="button"
+                        onClick={advanceSemester}
+                        className="pixel-button rounded-none bg-teal px-6 py-4 font-display text-xs uppercase text-ink"
+                      >
+                        Start {getSemesterDefinition(nextSemesterId).title}
+                      </button>
+                    ) : null}
+                    <button
+                      type="button"
+                      onClick={restart}
+                      className="pixel-button rounded-none bg-coral px-6 py-4 font-display text-xs uppercase text-ink"
+                    >
+                      Restart the Story
+                    </button>
+                  </div>
                 </div>
               )}
             </SignedIn>
@@ -585,7 +709,7 @@ export function GameShell() {
           </section>
 
           <section className="pixel-panel bg-ink/85 p-5">
-            <p className="font-display text-xs uppercase leading-relaxed text-gold">Semester stats</p>
+            <p className="font-display text-xs uppercase leading-relaxed text-gold">Cumulative stats</p>
             <div className="mt-5 space-y-5">
               <StatMeter label="Academics" value={(save?.step === "planner" ? previewStats.academics : save?.stats.academics) ?? DEFAULT_STATS.academics} color={statColors.academics} />
               <StatMeter label="Social" value={(save?.step === "planner" ? previewStats.social : save?.stats.social) ?? DEFAULT_STATS.social} color={statColors.social} />
@@ -593,6 +717,24 @@ export function GameShell() {
               <StatMeter label="Finances" value={(save?.step === "planner" ? previewStats.finances : save?.stats.finances) ?? DEFAULT_STATS.finances} color={statColors.finances} />
             </div>
           </section>
+
+          {save ? (
+            <section className="pixel-panel bg-ink/85 p-5">
+              <p className="font-display text-xs uppercase leading-relaxed text-sky">Relationships</p>
+              <div className="mt-5 space-y-5">
+                {(Object.keys(save.relationships) as RelationshipKey[]).map((key) => (
+                  <RelationshipMeter
+                    key={key}
+                    label={relationshipLabels[key]}
+                    value={save.relationships[key]}
+                    color={relationshipColors[key]}
+                  />
+                ))}
+              </div>
+            </section>
+          ) : null}
+
+          <CampusMap visited={visitedLocationIds} activeLocationId={currentScene?.locationId} />
 
           <PixelDormAnimation />
         </aside>
