@@ -150,7 +150,7 @@ export function getSemesterScenePlan(save: Pick<SaveData, "currentSemesterId" | 
     return [aldenScene, sceneDefinitionsById["derek-calendar-night"], sceneDefinitionsById["mina-anchor-night"], variableScene];
   }
 
-  if (save.stats.mental <= 45) {
+  if (save.currentSemesterId === "junior-spring" && save.stats.mental <= 45) {
     return [
       sceneDefinitionsById["derek-burnout-checkin"],
       sceneDefinitionsById["mina-poster-room"],
@@ -159,14 +159,35 @@ export function getSemesterScenePlan(save: Pick<SaveData, "currentSemesterId" | 
     ];
   }
 
-  const derekScene =
-    save.relationships.derek >= 60 ? sceneDefinitionsById["derek-burnout-checkin"] : sceneDefinitionsById["derek-night-walk"];
+  if (save.currentSemesterId === "junior-spring") {
+    const derekScene =
+      save.relationships.derek >= 60 ? sceneDefinitionsById["derek-burnout-checkin"] : sceneDefinitionsById["derek-night-walk"];
+
+    const variableScene = save.focusIds.includes("campus-job")
+      ? sceneDefinitionsById["offer-email"]
+      : sceneDefinitionsById["internship-fair"];
+
+    return [derekScene, sceneDefinitionsById["home-friends-visit"], sceneDefinitionsById["mina-poster-room"], variableScene];
+  }
+
+  if (save.currentSemesterId === "senior-fall") {
+    const aldenScene =
+      save.relationships.professorAlden >= 70 || save.stats.academics >= 86
+        ? sceneDefinitionsById["alden-farewell-advice"]
+        : sceneDefinitionsById["alden-last-draft"];
+
+    const variableScene = save.focusIds.includes("campus-job")
+      ? sceneDefinitionsById["leadership-handoff"]
+      : sceneDefinitionsById["capstone-choice"];
+
+    return [aldenScene, sceneDefinitionsById["derek-postgrad-talk"], sceneDefinitionsById["mina-keepsake-night"], variableScene];
+  }
 
   const variableScene = save.focusIds.includes("campus-job")
-    ? sceneDefinitionsById["offer-email"]
-    : sceneDefinitionsById["internship-fair"];
+    ? sceneDefinitionsById["graduation-morning"]
+    : sceneDefinitionsById["capstone-choice"];
 
-  return [derekScene, sceneDefinitionsById["home-friends-visit"], sceneDefinitionsById["mina-poster-room"], variableScene];
+  return [sceneDefinitionsById["derek-graduation-quiet"], sceneDefinitionsById["mina-last-bench"], variableScene, sceneDefinitionsById["graduation-morning"]];
 }
 
 export function getSceneFromPlan(
@@ -295,6 +316,32 @@ export function buildReflection(save: SaveData) {
     return `${minaText} ${burnoutText} By the end of junior spring, ${save.playerName} is no longer wondering whether adulthood is beginning. It already has.`;
   }
 
+  if (save.currentSemesterId === "senior-fall") {
+    const derekText =
+      save.relationships.derek >= 72
+        ? "Derek stopped being a campus chapter and became someone you now have to imagine in the grammar of a real life."
+        : "Love stayed real this year, but senior fall proved that even real love has to survive logistics, fear, and separate futures.";
+    const minaText =
+      save.relationships.mina >= 72
+        ? "Mina became one of the people who will always be inside your definition of home, no matter where you live next."
+        : "You learned that even anchor friendships need to be chosen on purpose when everyone is starting to leave.";
+
+    return `${derekText} ${minaText} Senior fall taught ${save.playerName} that endings are not only about loss. They are also about deciding what deserves to be carried forward.`;
+  }
+
+  if (save.currentSemesterId === "senior-spring") {
+    const futureTone =
+      save.stats.finances >= 78 || save.stats.academics >= 88
+        ? "You leave college with a future sharp enough to name."
+        : "You leave college without every answer, but with a truer sense of what kind of life you can actually inhabit.";
+    const relationshipTone =
+      save.relationships.derek >= 74 && save.relationships.mina >= 72
+        ? "The people you chose became part of the ending, which is another way of saying they became part of the beginning too."
+        : "Not everything survived unchanged, but enough did to prove that the person you became here was real.";
+
+    return `${futureTone} ${relationshipTone} ${save.playerName} arrives at graduation understanding that adulthood is not a solved equation. It is a life you keep consenting to, one concrete choice at a time.`;
+  }
+
   const openings: Record<StatKey, string> = {
     academics: "You leave the semester with your backpack heavier and your confidence quieter, but real.",
     social: "By December, campus feels less like a maze and more like a map with names on it.",
@@ -331,6 +378,14 @@ export function getNextSemesterId(currentSemesterId: SemesterId) {
 
   if (currentSemesterId === "junior-fall") {
     return "junior-spring";
+  }
+
+  if (currentSemesterId === "junior-spring") {
+    return "senior-fall";
+  }
+
+  if (currentSemesterId === "senior-fall") {
+    return "senior-spring";
   }
 
   return null;

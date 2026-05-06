@@ -95,6 +95,28 @@ export const semesterDefinitions: Record<SemesterId, SemesterDefinition> = {
     plannerPrompt:
       "Junior spring is where momentum turns into consequence. Pick exactly three priorities to decide what kind of future this pressure is building.",
     reflectionPrompt: "Year three, chapter two"
+  },
+  "senior-fall": {
+    id: "senior-fall",
+    title: "Senior Fall",
+    badge: "Year Four, Semester One",
+    arrivalTitle: "Almost the last year",
+    arrivalCopy:
+      "Senior year begins with the strange loneliness of already being on your way out. Campus still belongs to you, but it also feels like it is slowly learning how to continue without you.",
+    plannerPrompt:
+      "Senior fall is about closure, leadership, and the shape of the life waiting after graduation. Pick exactly three priorities to decide what deserves your last long season here.",
+    reflectionPrompt: "Year four, chapter one"
+  },
+  "senior-spring": {
+    id: "senior-spring",
+    title: "Senior Spring",
+    badge: "Year Four, Semester Two",
+    arrivalTitle: "Last semester",
+    arrivalCopy:
+      "The last semester arrives before you feel ready. Every ordinary day starts glowing at the edges, as if campus already knows this is the final time it will hold this version of you.",
+    plannerPrompt:
+      "Senior spring is about endings, commitment, and choosing the life that begins after this one. Pick exactly three priorities to decide what survives the crossing.",
+    reflectionPrompt: "Year four, chapter two"
   }
 };
 
@@ -1387,6 +1409,340 @@ export const sceneDefinitionsById: Record<string, SceneDefinition> = {
         description: "Trust your body more than your panic for one night.",
         statEffects: { mental: 6, academics: -2 },
         nextFlavorPrompt: "The player lets rest be the decision even when ambition hates it."
+      }
+    ]
+  },
+  "alden-farewell-advice": {
+    id: "alden-farewell-advice",
+    title: "Farewell Advice",
+    setting: "Professor Alden asks you to stop by his office, not for a deadline this time but because he wants to know where you think your mind belongs after graduation.",
+    background: "/backgrounds/professor-office.svg",
+    character: "Professor Alden",
+    locationId: "humanities",
+    locationLabel: "Humanities Hall",
+    summary:
+      "He is still exacting, but the conversation has shifted into something close to respect. You can accept his belief in you, ask whether the future has to be so singular, or admit you are more afraid of leaving than you expected.",
+    promptSeed: "A senior student has a final meaningful mentor conversation about what kind of future they should choose.",
+    choices: [
+      {
+        id: "accept-his-belief",
+        label: "Accept his belief",
+        description: "Let mentorship land as something earned and real.",
+        statEffects: { academics: 7, mental: 2 },
+        relationshipEffects: { professorAlden: 6 },
+        nextFlavorPrompt: "The player accepts a mentor's deep belief in their future with grounded pride."
+      },
+      {
+        id: "ask-for-broader-life",
+        label: "Ask for a broader life",
+        description: "Tell him you want a future that feels inhabited, not only impressive.",
+        statEffects: { mental: 5, academics: 2, social: 1 },
+        relationshipEffects: { professorAlden: 4 },
+        nextFlavorPrompt: "The player pushes beyond prestige and asks for a life that still feels human."
+      },
+      {
+        id: "admit-fear-of-leaving",
+        label: "Admit you are afraid",
+        description: "Say the thing ambition kept disguising: you do not know how to stop being this version of yourself.",
+        statEffects: { mental: 6, academics: 1 },
+        relationshipEffects: { professorAlden: 5 },
+        nextFlavorPrompt: "The player lets a trusted mentor witness their fear of becoming someone new after graduation."
+      }
+    ]
+  },
+  "alden-last-draft": {
+    id: "alden-last-draft",
+    title: "Last Draft",
+    setting: "Professor Alden returns one of your final papers with fewer notes than usual and the unnerving sense that you are now being read as a peer in the making.",
+    background: "/backgrounds/professor-office.svg",
+    character: "Professor Alden",
+    locationId: "humanities",
+    locationLabel: "Humanities Hall",
+    summary:
+      "Senior fall reframes criticism into inheritance. You can embrace the rigor, ask what matters beyond excellence, or admit you are tired of being legible only through work.",
+    promptSeed: "A senior student's long mentor relationship culminates in a final demanding but respectful academic exchange.",
+    choices: [
+      {
+        id: "embrace-rigor",
+        label: "Embrace the rigor",
+        description: "Take the final challenge and let it sharpen your closing semester.",
+        statEffects: { academics: 8, mental: -2 },
+        relationshipEffects: { professorAlden: 4 },
+        nextFlavorPrompt: "The player accepts one last demanding push from a mentor they respect."
+      },
+      {
+        id: "ask-beyond-excellence",
+        label: "Ask what matters beyond excellence",
+        description: "Refuse to let your life be graded only by polish and output.",
+        statEffects: { mental: 4, academics: 2, social: 1 },
+        relationshipEffects: { professorAlden: 5 },
+        nextFlavorPrompt: "The player challenges a narrow definition of success while keeping the mentor relationship intact."
+      },
+      {
+        id: "say-you-are-tired",
+        label: "Say you are tired",
+        description: "Not defiant, just honest: the cost has started to show.",
+        statEffects: { mental: 5, academics: -2 },
+        relationshipEffects: { professorAlden: 3 },
+        nextFlavorPrompt: "The player speaks plainly about the fatigue behind their ambition."
+      }
+    ]
+  },
+  "derek-postgrad-talk": {
+    id: "derek-postgrad-talk",
+    title: "Post-Grad Talk",
+    setting: "Derek takes your hand on a long walk after dinner and asks the question both of you have been circling for weeks: what does us look like after graduation?",
+    background: "/backgrounds/snow-quad.svg",
+    character: "Derek",
+    locationId: "lake-path",
+    locationLabel: "Lake Path",
+    summary:
+      "The relationship is real enough now that the future can either deepen it or expose its limits. You can imagine a shared future, ask for patience and flexibility, or protect the love by refusing to promise more than you can live.",
+    promptSeed: "A real college relationship reaches the senior-year question of whether love can survive post-grad change.",
+    choices: [
+      {
+        id: "imagine-shared-future",
+        label: "Imagine a shared future",
+        description: "Let love be concrete enough to plan around.",
+        statEffects: { social: 8, mental: 4 },
+        relationshipEffects: { derek: 10 },
+        nextFlavorPrompt: "The player allows a real relationship to become part of their future planning."
+      },
+      {
+        id: "ask-for-patience",
+        label: "Ask for patience",
+        description: "Tell him you want this, but not in a way that crushes either of your futures.",
+        statEffects: { mental: 5, social: 5 },
+        relationshipEffects: { derek: 7 },
+        nextFlavorPrompt: "The player chooses love with honesty about uncertainty and timing."
+      },
+      {
+        id: "refuse-to-promise",
+        label: "Refuse to promise",
+        description: "You love what is real now more than you trust predictions about later.",
+        statEffects: { mental: 2, social: -2 },
+        relationshipEffects: { derek: -6 },
+        nextFlavorPrompt: "The player protects themselves from false certainty even though it hurts the relationship."
+      }
+    ]
+  },
+  "derek-graduation-quiet": {
+    id: "derek-graduation-quiet",
+    title: "Graduation Quiet",
+    setting: "The night before graduation, Derek sits beside you in the half-packed room and lets the silence do some of the talking first.",
+    background: "/backgrounds/phone-glow.svg",
+    character: "Derek",
+    locationId: "residence-room",
+    locationLabel: "Dorm Room",
+    summary:
+      "This is what it feels like when love has survived enough pressure to become gentle. You can tell him exactly what he has meant to you, ask how to keep choosing each other in motion, or admit that endings make you afraid to trust even the good things.",
+    promptSeed: "A senior couple shares a quiet, honest moment before graduation and the beginning of real adulthood.",
+    choices: [
+      {
+        id: "tell-him-what-he-meant",
+        label: "Tell him what he meant",
+        description: "Say the grateful, terrifying truth of what it means to have been loved well here.",
+        statEffects: { mental: 5, social: 7 },
+        relationshipEffects: { derek: 10 },
+        nextFlavorPrompt: "The player lets real love be named clearly at the threshold of graduation."
+      },
+      {
+        id: "ask-how-to-keep-choosing",
+        label: "Ask how to keep choosing each other",
+        description: "Let the future become a practical conversation instead of only a feeling.",
+        statEffects: { social: 6, finances: 1, mental: 3 },
+        relationshipEffects: { derek: 7 },
+        nextFlavorPrompt: "The player turns love into a shared practice for the life after college."
+      },
+      {
+        id: "admit-ending-fear",
+        label: "Admit you are afraid",
+        description: "Tell him endings make you suspicious even of the things you want to keep.",
+        statEffects: { mental: 4, social: 3 },
+        relationshipEffects: { derek: 5 },
+        nextFlavorPrompt: "The player brings fear honestly into a mature relationship instead of hiding behind composure."
+      }
+    ]
+  },
+  "mina-keepsake-night": {
+    id: "mina-keepsake-night",
+    title: "Keepsake Night",
+    setting: "Mina spreads old flyers, photos, and ridiculous keepsakes across the floor like she is making evidence that your college life really happened.",
+    background: "/backgrounds/student-union.svg",
+    character: "Mina",
+    locationId: "north-dorm",
+    locationLabel: "North Dorm",
+    summary:
+      "Best friendship in senior year is less about proving closeness and more about remembering each other correctly. You can help her make meaning of it, admit how much the friendship held you together, or joke your way around the ache because endings feel too real tonight.",
+    promptSeed: "Two college best friends reflect on the life they built together as graduation approaches.",
+    choices: [
+      {
+        id: "make-meaning-together",
+        label: "Make meaning together",
+        description: "Treat memory like part of the friendship, not just a leftover from it.",
+        statEffects: { mental: 5, social: 6 },
+        relationshipEffects: { mina: 8 },
+        nextFlavorPrompt: "The player deepens a best friendship by honoring its history with intention."
+      },
+      {
+        id: "admit-she-held-you-together",
+        label: "Admit what she meant",
+        description: "Tell Mina she became one of the ways this place ever felt livable.",
+        statEffects: { mental: 6, social: 5 },
+        relationshipEffects: { mina: 10 },
+        nextFlavorPrompt: "The player names their best friend as a real emotional anchor of college life."
+      },
+      {
+        id: "joke-around-ache",
+        label: "Joke around it",
+        description: "Stay funny and bright because grief for endings still embarrasses you a little.",
+        statEffects: { social: 3, mental: -1 },
+        relationshipEffects: { mina: 1 },
+        nextFlavorPrompt: "The player protects themselves from the ache of leaving by staying on the surface."
+      }
+    ]
+  },
+  "mina-last-bench": {
+    id: "mina-last-bench",
+    title: "Last Bench",
+    setting: "You and Mina sit on the same campus bench you used to collapse onto after impossible weeks, except now the impossible week is almost over forever.",
+    background: "/backgrounds/snow-quad.svg",
+    character: "Mina",
+    locationId: "lake-path",
+    locationLabel: "Lake Path",
+    summary:
+      "She is the person who knows the most versions of you from this place. You can promise the friendship a future, thank her without making promises you cannot keep, or admit you do not know how to leave without grieving harder than you expected.",
+    promptSeed: "A final senior-year best-friend scene about gratitude, continuity, and what survives after college.",
+    choices: [
+      {
+        id: "promise-future-friendship",
+        label: "Promise the future",
+        description: "Treat the friendship as something you plan to keep building after graduation.",
+        statEffects: { social: 7, mental: 4 },
+        relationshipEffects: { mina: 9 },
+        nextFlavorPrompt: "The player chooses to carry a college best friendship forward deliberately."
+      },
+      {
+        id: "thank-her-honestly",
+        label: "Thank her honestly",
+        description: "Let gratitude be enough without forcing a certainty neither of you can guarantee.",
+        statEffects: { mental: 5, social: 5 },
+        relationshipEffects: { mina: 7 },
+        nextFlavorPrompt: "The player honors a best friendship with mature gratitude and realistic love."
+      },
+      {
+        id: "admit-grief-leaving",
+        label: "Admit the grief",
+        description: "Say out loud that leaving this life hurts more than you thought it would.",
+        statEffects: { mental: 6, social: 4 },
+        relationshipEffects: { mina: 8 },
+        nextFlavorPrompt: "The player trusts their best friend with the grief of ending a shared chapter."
+      }
+    ]
+  },
+  "leadership-handoff": {
+    id: "leadership-handoff",
+    title: "Leadership Handoff",
+    setting: "You spend an evening teaching younger students how to run something you used to be overwhelmed just to enter.",
+    background: "/backgrounds/student-union.svg",
+    character: "Yourself",
+    locationId: "student-union",
+    locationLabel: "Student Union",
+    summary:
+      "Senior fall turns you into the older student in the room. You can mentor generously, cling a little too tightly to being needed, or step back and let the next version of campus happen without you.",
+    promptSeed: "A senior student faces the emotional complexity of leadership, legacy, and letting go.",
+    choices: [
+      {
+        id: "mentor-generously",
+        label: "Mentor generously",
+        description: "Give away what you learned like it was always meant to leave your hands.",
+        statEffects: { social: 6, academics: 3, mental: 2 },
+        nextFlavorPrompt: "The player handles leadership as stewardship instead of self-protection."
+      },
+      {
+        id: "cling-to-being-needed",
+        label: "Cling to being needed",
+        description: "You are not ready to stop being central here yet.",
+        statEffects: { social: 2, mental: -3, academics: 2 },
+        nextFlavorPrompt: "The player struggles to separate meaning from indispensability."
+      },
+      {
+        id: "step-back-gracefully",
+        label: "Step back gracefully",
+        description: "Make room for the next people without turning it into a personal loss.",
+        statEffects: { mental: 4, social: 4 },
+        nextFlavorPrompt: "The player practices leaving well instead of resisting it."
+      }
+    ]
+  },
+  "capstone-choice": {
+    id: "capstone-choice",
+    title: "Capstone Choice",
+    setting: "A capstone, a job lead, and a half-formed alternate plan all sit on your desk at once, each one insisting it is the most adult version of your future.",
+    background: "/backgrounds/phone-glow.svg",
+    character: "Yourself",
+    locationId: "residence-room",
+    locationLabel: "Dorm Room",
+    summary:
+      "Senior year wants commitment. You can choose the clearest career path, choose the work that feels most alive, or choose room to breathe even if nobody would call that impressive.",
+    promptSeed: "A senior student chooses between prestige, passion, and sustainability as graduation approaches.",
+    choices: [
+      {
+        id: "choose-clear-career",
+        label: "Choose the clearest career path",
+        description: "Stability and momentum matter, and you are tired of pretending they do not.",
+        statEffects: { finances: 7, academics: 5, mental: -2 },
+        nextFlavorPrompt: "The player chooses a concrete and ambitious future path."
+      },
+      {
+        id: "choose-alive-work",
+        label: "Choose the work that feels alive",
+        description: "You want a future that still feels like yours from the inside.",
+        statEffects: { academics: 4, mental: 4, social: 1 },
+        nextFlavorPrompt: "The player chooses meaning and aliveness over the safest prestige route."
+      },
+      {
+        id: "choose-room-to-breathe",
+        label: "Choose room to breathe",
+        description: "You are done treating exhaustion like proof of seriousness.",
+        statEffects: { mental: 7, finances: -2 },
+        nextFlavorPrompt: "The player chooses sustainability over the most externally impressive future."
+      }
+    ]
+  },
+  "graduation-morning": {
+    id: "graduation-morning",
+    title: "Graduation Morning",
+    setting: "The morning of graduation feels less triumphant than strangely intimate: borrowed gowns, safety pins, texts from people who knew you before any of this, and the knowledge that today is both ending and beginning.",
+    background: "/backgrounds/campus-arrival.svg",
+    character: "Yourself",
+    locationId: "campus-gate",
+    locationLabel: "Campus Gate",
+    summary:
+      "You can stand in the accomplishment, let yourself feel the loss too, or focus on the people beside you instead of the ceremony itself.",
+    promptSeed: "A senior student on graduation morning decides how to emotionally meet the ending of college.",
+    choices: [
+      {
+        id: "stand-in-accomplishment",
+        label: "Stand in the accomplishment",
+        description: "Let yourself feel finished in a way that is proud, not only relieved.",
+        statEffects: { academics: 5, mental: 3 },
+        nextFlavorPrompt: "The player meets graduation with earned pride."
+      },
+      {
+        id: "feel-the-loss-too",
+        label: "Feel the loss too",
+        description: "Achievement does not cancel grief for the life that is ending.",
+        statEffects: { mental: 6, social: 2 },
+        nextFlavorPrompt: "The player allows graduation to be both beautiful and sad."
+      },
+      {
+        id: "focus-on-people",
+        label: "Focus on the people",
+        description: "Measure this ending by who walks beside you, not only by what you did.",
+        statEffects: { social: 6, mental: 4 },
+        relationshipEffects: { derek: 2, mina: 2, homeFriends: 2 },
+        nextFlavorPrompt: "The player understands graduation through relationships instead of performance."
       }
     ]
   }

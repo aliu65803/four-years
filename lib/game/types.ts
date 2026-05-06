@@ -6,7 +6,9 @@ export type SemesterId =
   | "sophomore-fall"
   | "sophomore-spring"
   | "junior-fall"
-  | "junior-spring";
+  | "junior-spring"
+  | "senior-fall"
+  | "senior-spring";
 
 export type Stats = Record<StatKey, number>;
 export type Relationships = Record<RelationshipKey, number>;
