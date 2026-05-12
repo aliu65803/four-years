@@ -12,12 +12,18 @@ import {
 } from "@/lib/game/data";
 import { RelationshipKey, SaveData, SceneChoice, SceneDefinition, Stats } from "@/lib/game/types";
 import {
+  applyCommunicationEffects,
   applyEffects,
   applyRelationshipEffects,
+  buildEndingCard,
+  buildMemoryArchive,
   buildReflection,
   buildSemesterAdvance,
   createNewSave,
+  describeCommunication,
   describeRelationships,
+  finishPhoneStep,
+  getCurrentPhoneThread,
   getNextSemesterId,
   getSaveStorageKey,
   getSceneFromPlan,
@@ -59,6 +65,74 @@ function StatMeter({ label, value, color }: { label: string; value: number; colo
         <div className={clsx("h-full transition-all duration-500", color)} style={{ width: `${value}%` }} />
       </div>
     </div>
+  );
+}
+
+function YearbookArchive({ entries }: { entries: ReturnType<typeof buildMemoryArchive> }) {
+  return (
+    <section className="pixel-panel bg-[#f1e3bf] p-5 text-ink">
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <p className="font-display text-xs uppercase leading-relaxed text-ink">Yearbook Archive</p>
+          <p className="mt-3 text-2xl leading-6 text-ink/80">A little scrapbook of what each semester actually left behind.</p>
+        </div>
+        <div className="rounded-none border-2 border-ink/40 bg-[#fff4db] px-3 py-2 text-xl uppercase tracking-[0.18em] text-coral">
+          {entries.length} pages
+        </div>
+      </div>
+
+      <div className="yearbook-stack mt-5">
+        {entries.length > 0 ? (
+          entries.map((entry) => (
+            <article key={`${entry.semesterId}-${entry.isCurrent ? "current" : "past"}`} className={clsx("yearbook-card", entry.isCurrent && "is-current")}>
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p className="font-display text-[10px] uppercase leading-relaxed text-coral sm:text-xs">{entry.yearLabel}</p>
+                  <h3 className="mt-2 text-3xl uppercase tracking-[0.12em]">{entry.title}</h3>
+                </div>
+                <span className="yearbook-badge">{entry.badge}</span>
+              </div>
+              <p className="mt-4 text-2xl leading-6 text-ink/90">{entry.memoryTitle}</p>
+              <p className="mt-4 text-xl leading-6 text-ink/70">{entry.reflectionExcerpt}</p>
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                <div className="yearbook-stamp">
+                  <p className="font-display text-[10px] uppercase leading-relaxed text-ink/70 sm:text-xs">Priorities</p>
+                  <p className="mt-2 text-xl leading-6">{entry.focusText || "Still forming."}</p>
+                </div>
+                <div className="yearbook-stamp">
+                  <p className="font-display text-[10px] uppercase leading-relaxed text-ink/70 sm:text-xs">Memory note</p>
+                  <p className="mt-2 text-xl leading-6">{entry.memoryNote}</p>
+                </div>
+              </div>
+            </article>
+          ))
+        ) : (
+          <div className="yearbook-card">
+            <p className="text-2xl leading-6 text-ink/75">The yearbook starts filling itself the first time a semester ends.</p>
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function PhoneChoiceCard({
+  label,
+  description,
+  previewReply,
+  onChoose
+}: {
+  label: string;
+  description: string;
+  previewReply: string;
+  onChoose: () => void;
+}) {
+  return (
+    <button type="button" onClick={onChoose} className="pixel-button rounded-none bg-parchment p-4 text-left text-ink">
+      <p className="font-display text-xs uppercase leading-relaxed">{label}</p>
+      <p className="mt-3 text-2xl leading-6">{description}</p>
+      <p className="mt-4 border-t-2 border-ink/20 pt-4 text-xl italic text-ink/70">{previewReply}</p>
+    </button>
   );
 }
 
@@ -330,8 +404,11 @@ export function GameShell() {
   const semester = useMemo(() => (save ? getSemesterDefinition(save.currentSemesterId) : semesterDefinitions["freshman-fall"]), [save]);
   const scenePlan = useMemo(() => (save ? getSemesterScenePlan(save) : []), [save]);
   const currentScene = useMemo(() => (save ? getSceneFromPlan(save, save.sceneIndex) : null), [save]);
+  const currentPhoneThread = useMemo(() => (save ? getCurrentPhoneThread(save) : null), [save]);
   const visitedLocationIds = useMemo(() => (save ? getVisitedLocationIds(save) : new Set<string>()), [save]);
   const nextSemesterId = useMemo(() => (save ? getNextSemesterId(save.currentSemesterId) : null), [save]);
+  const endingCard = useMemo(() => (save?.currentSemesterId === "senior-spring" && save.step === "summary" ? buildEndingCard(save) : null), [save]);
+  const archiveEntries = useMemo(() => (save ? buildMemoryArchive(save) : []), [save]);
 
   const previewStats = useMemo(() => {
     if (!save) {
@@ -448,6 +525,7 @@ export function GameShell() {
       ...save,
       stats: nextStats,
       relationships: nextRelationships,
+      storyFlags: [...new Set([...save.storyFlags, choice.id, ...(choice.flags ?? [])])],
       sceneIndex: nextSceneIndex,
       step: nextStep,
       choiceHistory: [...save.choiceHistory, { sceneId: scene.id, choiceId: choice.id }],
@@ -457,6 +535,61 @@ export function GameShell() {
     setFlavor({
       text: result.dialogue,
       provider: result.provider,
+      loading: false
+    });
+  };
+
+  const handlePhoneChoice = (choiceId: string) => {
+    if (!save || save.step !== "phone" || !currentPhoneThread) {
+      return;
+    }
+
+    const choice = currentPhoneThread.choices.find((entry) => entry.id === choiceId);
+    if (!choice) {
+      return;
+    }
+
+    const nextStats = applyEffects(save.stats, choice.statEffects ?? {});
+    const nextRelationships = applyRelationshipEffects(save.relationships, choice.relationshipEffects);
+    const nextCommunication = applyCommunicationEffects(
+      save.communication,
+      choice.threadEffects,
+      choice.id,
+      currentPhoneThread.id
+    );
+    const nextThreadIndex = save.phoneThreadIndex + 1;
+
+    setSave({
+      ...save,
+      stats: nextStats,
+      relationships: nextRelationships,
+      communication: nextCommunication,
+      phoneThreadIndex: nextThreadIndex,
+      storyFlags: [...new Set([...save.storyFlags, choice.id, ...(choice.flags ?? [])])],
+      updatedAt: new Date().toISOString()
+    });
+    setFlavor({
+      text: choice.previewReply === "..." ? "You let the silence carry more than the message did." : choice.previewReply,
+      provider: "fallback",
+      loading: false
+    });
+  };
+
+  const continueFromPhone = () => {
+    if (!save) {
+      return;
+    }
+
+    const advanced = finishPhoneStep(save);
+    if (!advanced) {
+      return;
+    }
+
+    setSave(advanced);
+    const nextSemester = getSemesterDefinition(advanced.currentSemesterId);
+    setFlavor({
+      text: `${save.playerName} returns for ${nextSemester.title.toLowerCase()} with a few more answered messages and a slightly clearer sense of who still feels reachable.`,
+      provider: "fallback",
       loading: false
     });
   };
@@ -676,7 +809,17 @@ export function GameShell() {
                     <p className="text-2xl text-parchment/85">
                       Relationship totals now read {describeRelationships(save.relationships)}. Future semesters can open or close depending on what you built here.
                     </p>
+                    <p className="text-2xl text-parchment/75">{describeCommunication(save.communication)}.</p>
                   </div>
+                  {endingCard ? (
+                    <div className="space-y-4 border-4 border-parchment/50 bg-[#21324f] p-5">
+                      <p className="font-display text-xs uppercase leading-relaxed text-gold">Graduation outcome</p>
+                      <h2 className="text-4xl uppercase tracking-[0.12em] text-parchment sm:text-5xl">{endingCard.title}</h2>
+                      <p className="text-3xl leading-8 text-parchment/90">{endingCard.subtitle}</p>
+                      <p className="text-2xl leading-7 text-parchment/85">{endingCard.epilogue}</p>
+                      <p className="text-2xl italic text-gold">{endingCard.identityLine}</p>
+                    </div>
+                  ) : null}
                   <div className="flex flex-wrap gap-4">
                     {nextSemesterId ? (
                       <button
@@ -684,7 +827,7 @@ export function GameShell() {
                         onClick={advanceSemester}
                         className="pixel-button rounded-none bg-teal px-6 py-4 font-display text-xs uppercase text-ink"
                       >
-                        Start {getSemesterDefinition(nextSemesterId).title}
+                        Check Your Phone
                       </button>
                     ) : null}
                     <button
@@ -695,6 +838,61 @@ export function GameShell() {
                       Restart the Story
                     </button>
                   </div>
+                </div>
+              )}
+
+              {save?.step === "phone" && currentPhoneThread && (
+                <div className="mt-8 space-y-6">
+                  <div className="relative overflow-hidden border-4 border-parchment/60 bg-[#253759]">
+                    <Image src="/backgrounds/phone-glow.svg" alt={currentPhoneThread.title} width={1200} height={800} className="h-[320px] w-full object-cover" />
+                    <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-ink to-transparent p-4">
+                      <p className="font-display text-[10px] uppercase leading-relaxed text-sky sm:text-xs">Between semesters</p>
+                      <h2 className="mt-2 text-3xl uppercase tracking-[0.12em] text-parchment sm:text-4xl">{currentPhoneThread.title}</h2>
+                    </div>
+                  </div>
+                  <div className="space-y-4 bg-ink/55 p-5">
+                    <p className="font-display text-xs uppercase leading-relaxed text-gold">{currentPhoneThread.from}</p>
+                    <p className="text-2xl text-parchment/85">{currentPhoneThread.intro}</p>
+                    <div className="space-y-3">
+                      {currentPhoneThread.messages.map((message, index) => (
+                        <div key={`${currentPhoneThread.id}-${index}`} className={clsx("max-w-[34rem] p-4 text-2xl leading-6", index === 0 ? "ml-auto bg-teal text-ink" : "bg-parchment text-ink")}>
+                          {message}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="grid gap-4">
+                    {currentPhoneThread.choices.map((choice) => (
+                      <PhoneChoiceCard
+                        key={choice.id}
+                        label={choice.label}
+                        description={choice.description}
+                        previewReply={choice.previewReply}
+                        onChoose={() => handlePhoneChoice(choice.id)}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {save?.step === "phone" && !currentPhoneThread && save.pendingSemesterId && (
+                <div className="mt-8 space-y-6">
+                  <div className="space-y-4 bg-ink/55 p-5">
+                    <p className="font-display text-xs uppercase leading-relaxed text-sky">Between semesters</p>
+                    <p className="text-3xl leading-8 text-parchment sm:text-4xl sm:leading-10">
+                      The break passed through calls, half-kept plans, and the quiet proof that some connections survived because you acted like they mattered.
+                    </p>
+                    <p className="text-2xl text-parchment/85">
+                      Next up: {getSemesterDefinition(save.pendingSemesterId).title}.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={continueFromPhone}
+                    className="pixel-button rounded-none bg-gold px-6 py-4 font-display text-xs uppercase text-ink"
+                  >
+                    Return to Campus
+                  </button>
                 </div>
               )}
             </SignedIn>
@@ -733,6 +931,8 @@ export function GameShell() {
               </div>
             </section>
           ) : null}
+
+          {save ? <YearbookArchive entries={archiveEntries} /> : null}
 
           <CampusMap visited={visitedLocationIds} activeLocationId={currentScene?.locationId} />
 

@@ -1,4 +1,6 @@
 import {
+  CommunicationHistory,
+  CommunicationThreadKey,
   RelationshipKey,
   Relationships,
   SceneDefinition,
@@ -22,10 +24,34 @@ export const DEFAULT_RELATIONSHIPS: Relationships = {
   derek: 30
 };
 
+export const DEFAULT_COMMUNICATION: CommunicationHistory = {
+  homeFriends: {
+    sent: 0,
+    ignored: 0,
+    lastChoiceId: ""
+  },
+  mina: {
+    sent: 0,
+    ignored: 0,
+    lastChoiceId: ""
+  },
+  derek: {
+    sent: 0,
+    ignored: 0,
+    lastChoiceId: ""
+  }
+};
+
 export const relationshipLabels: Record<RelationshipKey, string> = {
   professorAlden: "Professor Alden",
   mina: "Mina",
   homeFriends: "Home Friends",
+  derek: "Derek"
+};
+
+export const communicationLabels: Record<CommunicationThreadKey, string> = {
+  homeFriends: "Home Friends",
+  mina: "Mina",
   derek: "Derek"
 };
 

@@ -1,5 +1,6 @@
 export type StatKey = "academics" | "social" | "mental" | "finances";
 export type RelationshipKey = "professorAlden" | "mina" | "homeFriends" | "derek";
+export type CommunicationThreadKey = "homeFriends" | "mina" | "derek";
 export type SemesterId =
   | "freshman-fall"
   | "freshman-spring"
@@ -65,22 +66,34 @@ export type SemesterRecord = {
   completedAt: string;
 };
 
-export type StoryStep = "arrival" | "planner" | "scene" | "reflection" | "summary";
+export type CommunicationRecord = {
+  sent: number;
+  ignored: number;
+  lastChoiceId: string;
+};
+
+export type CommunicationHistory = Record<CommunicationThreadKey, CommunicationRecord>;
+
+export type StoryStep = "arrival" | "planner" | "scene" | "reflection" | "summary" | "phone";
 
 export type SaveData = {
   version: number;
   playerName: string;
   playerId: string;
   currentSemesterId: SemesterId;
+  pendingSemesterId: SemesterId | null;
   step: StoryStep;
   focusIds: string[];
   stats: Stats;
   relationships: Relationships;
+  communication: CommunicationHistory;
   sceneIndex: number;
+  phoneThreadIndex: number;
   choiceHistory: {
     sceneId: string;
     choiceId: string;
   }[];
+  storyFlags: string[];
   reflection: string;
   semesterHistory: SemesterRecord[];
   updatedAt: string;

@@ -177,6 +177,55 @@ a {
   animation: pulse-pin 1.1s steps(2) infinite;
 }
 
+.yearbook-stack {
+  display: grid;
+  gap: 16px;
+  max-height: 520px;
+  overflow-y: auto;
+  padding-right: 6px;
+}
+
+.yearbook-card {
+  position: relative;
+  border: 3px solid #1a1e30;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.65), rgba(255, 255, 255, 0.55)),
+    repeating-linear-gradient(180deg, rgba(26, 30, 48, 0.05) 0 2px, transparent 2px 28px);
+  padding: 18px;
+  box-shadow: 6px 6px 0 rgba(26, 30, 48, 0.2);
+}
+
+.yearbook-card.is-current {
+  box-shadow: 0 0 0 4px rgba(233, 120, 95, 0.25), 6px 6px 0 rgba(26, 30, 48, 0.2);
+}
+
+.yearbook-card::after {
+  content: "";
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 18px;
+  height: 18px;
+  background: rgba(233, 120, 95, 0.2);
+  box-shadow: 0 0 0 3px rgba(26, 30, 48, 0.12);
+}
+
+.yearbook-badge {
+  border: 2px solid rgba(26, 30, 48, 0.28);
+  background: rgba(255, 244, 219, 0.9);
+  padding: 8px 10px;
+  font-size: 1.1rem;
+  line-height: 1.2;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+}
+
+.yearbook-stamp {
+  border: 2px dashed rgba(26, 30, 48, 0.24);
+  background: rgba(255, 250, 239, 0.7);
+  padding: 12px;
+}
+
 .pixel-moon {
   position: absolute;
   top: 24px;

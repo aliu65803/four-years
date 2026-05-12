@@ -22,7 +22,7 @@ const MAX_MEDIUM_TEXT_LENGTH = 320;
 const MAX_LONG_TEXT_LENGTH = 600;
 const MAX_SAVE_BODY_BYTES = 32_000;
 const MAX_FLAVOR_BODY_BYTES = 4_000;
-const STORY_STEPS: StoryStep[] = ["arrival", "planner", "scene", "reflection", "summary"];
+const STORY_STEPS: StoryStep[] = ["arrival", "planner", "scene", "reflection", "summary", "phone"];
 const SEMESTER_IDS: SemesterId[] = [
   "freshman-fall",
   "freshman-spring",
@@ -80,6 +80,26 @@ function normalizeRelationships(value: unknown) {
   };
 }
 
+function normalizeCommunication(value: unknown) {
+  const communication = isRecord(value) ? value : {};
+
+  const normalizeThread = (threadValue: unknown) => {
+    const thread = isRecord(threadValue) ? threadValue : {};
+
+    return {
+      sent: Math.max(0, Math.min(24, Number(thread.sent) || 0)),
+      ignored: Math.max(0, Math.min(24, Number(thread.ignored) || 0)),
+      lastChoiceId: normalizeString(thread.lastChoiceId, MAX_SHORT_TEXT_LENGTH)
+    };
+  };
+
+  return {
+    homeFriends: normalizeThread(communication.homeFriends),
+    mina: normalizeThread(communication.mina),
+    derek: normalizeThread(communication.derek)
+  };
+}
+
 export function getBodySizeBytes(body: unknown) {
   return Buffer.byteLength(JSON.stringify(body ?? {}), "utf8");
 }
@@ -119,6 +139,10 @@ export function validateSaveData(body: unknown, userId: string) {
   const currentSemesterId = SEMESTER_IDS.includes(body.currentSemesterId as SemesterId)
     ? (body.currentSemesterId as SemesterId)
     : "freshman-fall";
+  const pendingSemesterId =
+    body.pendingSemesterId && SEMESTER_IDS.includes(body.pendingSemesterId as SemesterId)
+      ? (body.pendingSemesterId as SemesterId)
+      : null;
   const step = STORY_STEPS.includes(body.step as StoryStep) ? (body.step as StoryStep) : "arrival";
   const choiceHistory = Array.isArray(body.choiceHistory)
     ? body.choiceHistory
@@ -159,12 +183,16 @@ export function validateSaveData(body: unknown, userId: string) {
     playerName: normalizeString(body.playerName, MAX_PLAYER_NAME_LENGTH, "Freshman"),
     playerId: userId,
     currentSemesterId,
+    pendingSemesterId,
     step,
     focusIds: normalizeStringArray(body.focusIds, 3, MAX_SHORT_TEXT_LENGTH),
     stats: normalizeStats(body.stats),
     relationships: normalizeRelationships(body.relationships),
+    communication: normalizeCommunication(body.communication),
     sceneIndex: Math.max(0, Math.min(8, Number(body.sceneIndex) || 0)),
+    phoneThreadIndex: Math.max(0, Math.min(4, Number(body.phoneThreadIndex) || 0)),
     choiceHistory,
+    storyFlags: normalizeStringArray(body.storyFlags, 128, MAX_SHORT_TEXT_LENGTH),
     reflection: normalizeString(body.reflection, MAX_LONG_TEXT_LENGTH),
     semesterHistory,
     updatedAt: new Date().toISOString()
