@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { logModelUsage } from "@/lib/observability";
 
 type FlavorOptions = {
   playerName: string;
@@ -34,6 +35,7 @@ export async function generateFlavorDialogue(options: FlavorOptions) {
     return buildFallbackFlavor(options);
   }
 
+  const startedAt = Date.now();
   const anthropic = new Anthropic({
     apiKey: process.env.ANTHROPIC_API_KEY
   });
@@ -56,6 +58,16 @@ Choice consequence: ${options.nextFlavorPrompt}
 Stats: academics ${options.stats.academics}, social ${options.stats.social}, mental health ${options.stats.mental}, finances ${options.stats.finances}`
       }
     ]
+  });
+
+  logModelUsage({
+    provider: "anthropic",
+    model: process.env.ANTHROPIC_MODEL || "claude-3-5-sonnet-latest",
+    inputTokens: response.usage?.input_tokens ?? null,
+    outputTokens: response.usage?.output_tokens ?? null,
+    durationMs: Date.now() - startedAt,
+    character: options.character,
+    sceneTitle: options.sceneTitle
   });
 
   const text = response.content
