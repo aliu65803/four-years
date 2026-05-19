@@ -41,6 +41,62 @@ type FlavorState = {
   loading: boolean;
 };
 
+type TutorialTarget = "story" | "save" | "stats" | "relationships" | "phone" | "yearbook" | "map";
+
+type TutorialStep = {
+  target: TutorialTarget;
+  title: string;
+  body: string;
+  kicker: string;
+};
+
+const tutorialStorageKey = "four-years-tutorial-seen-v1";
+
+const tutorialSteps: TutorialStep[] = [
+  {
+    target: "story",
+    kicker: "Main panel",
+    title: "This is where the semester actually happens.",
+    body: "Use this big story area to move through arrival, the semester planner, scene choices, reflection, and each semester summary."
+  },
+  {
+    target: "save",
+    kicker: "Save box",
+    title: "Saving is manual now.",
+    body: "When the game says Unsaved changes, press Save Progress before you leave so this run stays attached to your account."
+  },
+  {
+    target: "stats",
+    kicker: "Cumulative stats",
+    title: "These numbers shape your future scenes.",
+    body: "Academics, Social, Mental, and Finances all carry forward across years and can unlock or close off later story branches."
+  },
+  {
+    target: "relationships",
+    kicker: "Relationships",
+    title: "Characters remember what you invest in.",
+    body: "These meters track how close you are to Mina, Derek, Professor Alden, and your home friends as the story keeps moving."
+  },
+  {
+    target: "phone",
+    kicker: "Phone",
+    title: "Texting is optional, but not neutral.",
+    body: "Pick who you want to text during the semester to boost that relationship. Anyone you ignore cools off a little by the time the term ends."
+  },
+  {
+    target: "yearbook",
+    kicker: "Yearbook",
+    title: "This archive keeps the emotional history of your run.",
+    body: "After each semester, a new memory card gets added here so players can look back at priorities, reflections, and what each chapter meant."
+  },
+  {
+    target: "map",
+    kicker: "Campus map",
+    title: "The map shows where this semester has taken you.",
+    body: "As scenes happen, campus locations light up so the run feels more physical and memorable instead of just a list of choices."
+  }
+];
+
 const statColors: Record<keyof Stats, string> = {
   academics: "bg-sky",
   social: "bg-coral",
@@ -305,6 +361,65 @@ function PhonePanel({
   );
 }
 
+function PhonePreviewPanel() {
+  return (
+    <section className="pixel-panel bg-[#243451] p-5 text-parchment">
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <p className="font-display text-xs uppercase leading-relaxed text-sky">Phone</p>
+          <p className="mt-3 text-2xl leading-6 text-parchment/90">
+            Your phone is part of the game from the start. Later, this is where you will choose who to text and which relationships to keep alive.
+          </p>
+        </div>
+        <div className="rounded-none border-2 border-parchment/40 bg-[#172238] px-3 py-2 text-xl uppercase tracking-[0.18em] text-gold">
+          Preview
+        </div>
+      </div>
+
+      <div className="mt-5 grid gap-4 lg:grid-cols-[0.42fr_0.58fr]">
+        <div className="space-y-3">
+          <div className="pixel-button flex w-full items-center justify-between rounded-none bg-teal px-4 py-3 text-left text-ink">
+            <div>
+              <p className="font-display text-xs uppercase leading-relaxed">Home Friends</p>
+              <p className="mt-2 text-xl leading-5">Waiting for freshman year to begin</p>
+            </div>
+            <span className="text-xl uppercase tracking-[0.14em]">Open</span>
+          </div>
+        </div>
+
+        <div className="space-y-4 bg-ink/45 p-4">
+          <p className="font-display text-xs uppercase leading-relaxed text-gold">Home Friends</p>
+          <p className="text-2xl text-parchment/85">The people who knew you before college will keep trying to reach you while you change.</p>
+          <div className="space-y-3">
+            <div className="max-w-[26rem] bg-teal p-4 text-2xl leading-6 text-ink">Home Friends</div>
+            <div className="max-w-[26rem] bg-parchment p-4 text-2xl leading-6 text-ink">Promise you’ll tell us everything once you get there.</div>
+            <div className="max-w-[26rem] bg-parchment p-4 text-2xl leading-6 text-ink">No reply needed yet. Just do not disappear on us.</div>
+          </div>
+          <div className="border-2 border-parchment/40 bg-[#172238] p-4 text-2xl leading-6 text-parchment/85">
+            Text choices unlock once your semester begins. For now, this shows where relationship maintenance will live.
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function RelationshipPreviewPanel() {
+  return (
+    <section className="pixel-panel bg-ink/85 p-5">
+      <p className="font-display text-xs uppercase leading-relaxed text-sky">Relationships</p>
+      <p className="mt-4 text-2xl leading-6 text-parchment/85">
+        These meters will start changing as soon as the story begins. Your choices decide who becomes a passing encounter and who becomes part of your life.
+      </p>
+      <div className="mt-5 space-y-5">
+        {(Object.keys(relationshipLabels) as RelationshipKey[]).map((key) => (
+          <RelationshipMeter key={key} label={relationshipLabels[key]} value={0} color={relationshipColors[key]} />
+        ))}
+      </div>
+    </section>
+  );
+}
+
 function PixelDormAnimation() {
   return (
     <section className="pixel-panel overflow-hidden bg-[#243451] p-5 text-parchment">
@@ -406,6 +521,59 @@ function CampusMap({ visited, activeLocationId }: { visited: Set<string>; active
   );
 }
 
+function TutorialOverlay({
+  step,
+  stepIndex,
+  totalSteps,
+  onClose,
+  onNext,
+  onBack
+}: {
+  step: TutorialStep;
+  stepIndex: number;
+  totalSteps: number;
+  onClose: () => void;
+  onNext: () => void;
+  onBack: () => void;
+}) {
+  const isLastStep = stepIndex === totalSteps - 1;
+
+  return (
+    <>
+      <div className="fixed inset-0 z-40 bg-ink/75 backdrop-blur-[1px]" />
+      <div className="fixed inset-x-4 bottom-4 z-[70] mx-auto max-w-2xl pixel-panel bg-parchment p-5 text-ink sm:inset-x-6 sm:bottom-6">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="font-display text-[10px] uppercase leading-relaxed text-coral sm:text-xs">{step.kicker}</p>
+            <h2 className="mt-3 text-3xl uppercase tracking-[0.12em] sm:text-4xl">{step.title}</h2>
+          </div>
+          <div className="rounded-none border-2 border-ink/25 bg-[#fff4db] px-3 py-2 text-xl uppercase tracking-[0.18em] text-ink/70">
+            {stepIndex + 1}/{totalSteps}
+          </div>
+        </div>
+        <p className="mt-4 text-2xl leading-7 text-ink/85">{step.body}</p>
+        <p className="mt-3 text-xl uppercase tracking-[0.16em] text-ink/60">The highlighted part of the screen is what this step is talking about.</p>
+        <div className="mt-5 flex flex-wrap gap-3">
+          <button type="button" onClick={onClose} className="pixel-button rounded-none bg-[#f7d59e] px-5 py-3 font-display text-xs uppercase text-ink">
+            Skip tutorial
+          </button>
+          <button
+            type="button"
+            onClick={onBack}
+            disabled={stepIndex === 0}
+            className="pixel-button rounded-none bg-[#d7e1f2] px-5 py-3 font-display text-xs uppercase text-ink"
+          >
+            Back
+          </button>
+          <button type="button" onClick={onNext} className="pixel-button rounded-none bg-teal px-5 py-3 font-display text-xs uppercase text-ink">
+            {isLastStep ? "Finish tutorial" : "Next tip"}
+          </button>
+        </div>
+      </div>
+    </>
+  );
+}
+
 function getPlayerName(user: ReturnType<typeof useUser>["user"]) {
   if (!user) {
     return "Freshman";
@@ -422,12 +590,34 @@ export function GameShell() {
   const [isSaving, setIsSaving] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [selectedPhoneThreadId, setSelectedPhoneThreadId] = useState<CommunicationThreadKey | null>(null);
+  const [hasSeenTutorial, setHasSeenTutorial] = useState(true);
+  const [showTutorial, setShowTutorial] = useState(false);
+  const [tutorialStepIndex, setTutorialStepIndex] = useState(0);
   const [flavor, setFlavor] = useState<FlavorState>({
     text: "Welcome to move-in day. The year is about to start making choices back at you.",
     provider: "fallback",
     loading: false
   });
   const lastPersistedSnapshotRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!hydrated) {
+      return;
+    }
+
+    const seen = window.localStorage.getItem(tutorialStorageKey) === "seen";
+    setHasSeenTutorial(seen);
+  }, [hydrated]);
+
+  useEffect(() => {
+    const activeTarget = showTutorial ? tutorialSteps[tutorialStepIndex]?.target : null;
+    if (!activeTarget) {
+      return;
+    }
+
+    const target = document.querySelector<HTMLElement>(`[data-tutorial-target="${activeTarget}"]`);
+    target?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [showTutorial, tutorialStepIndex]);
 
   useEffect(() => {
     if (!isLoaded) {
@@ -519,6 +709,35 @@ export function GameShell() {
 
     setHasUnsavedChanges(JSON.stringify(save) !== lastPersistedSnapshotRef.current);
   }, [save]);
+
+  const activeTutorialTarget = showTutorial ? tutorialSteps[tutorialStepIndex]?.target ?? null : null;
+
+  const tutorialTargetClass = (target: TutorialTarget) =>
+    clsx(activeTutorialTarget === target && "relative z-[60] ring-4 ring-gold ring-offset-4 ring-offset-[#121522]");
+
+  const closeTutorial = () => {
+    window.localStorage.setItem(tutorialStorageKey, "seen");
+    setHasSeenTutorial(true);
+    setShowTutorial(false);
+  };
+
+  const openTutorial = () => {
+    setTutorialStepIndex(0);
+    setShowTutorial(true);
+  };
+
+  const nextTutorialStep = () => {
+    if (tutorialStepIndex >= tutorialSteps.length - 1) {
+      closeTutorial();
+      return;
+    }
+
+    setTutorialStepIndex((current) => current + 1);
+  };
+
+  const previousTutorialStep = () => {
+    setTutorialStepIndex((current) => Math.max(0, current - 1));
+  };
 
   const handleManualSave = async () => {
     if (!save || !user || isSaving) {
@@ -806,8 +1025,18 @@ export function GameShell() {
 
   return (
     <main className="mx-auto min-h-screen max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+      {showTutorial ? (
+        <TutorialOverlay
+          step={tutorialSteps[tutorialStepIndex]}
+          stepIndex={tutorialStepIndex}
+          totalSteps={tutorialSteps.length}
+          onClose={closeTutorial}
+          onNext={nextTutorialStep}
+          onBack={previousTutorialStep}
+        />
+      ) : null}
       <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
-        <section className="pixel-panel scanlines relative overflow-hidden bg-ink/90">
+        <section data-tutorial-target="story" className={clsx("pixel-panel scanlines relative overflow-hidden bg-ink/90", tutorialTargetClass("story"))}>
           <div className="relative min-h-[720px] p-5 sm:p-7">
             <div className="flex flex-wrap items-center justify-between gap-4 border-b-4 border-parchment/50 pb-4">
               <div>
@@ -815,7 +1044,7 @@ export function GameShell() {
                 <h1 className="mt-3 text-4xl uppercase tracking-[0.12em] text-parchment sm:text-6xl">{semester.title}</h1>
               </div>
               <div className="flex items-start gap-3">
-                <div className="bg-parchment px-4 py-3 text-right text-ink">
+                <div data-tutorial-target="save" className={clsx("bg-parchment px-4 py-3 text-right text-ink", tutorialTargetClass("save"))}>
                   <p className="font-display text-[10px] uppercase sm:text-xs">Save Status</p>
                   <p className="mt-2 max-w-[16rem] text-2xl leading-6">{syncMessage}</p>
                   <SignedIn>
@@ -837,6 +1066,13 @@ export function GameShell() {
                       </p>
                     ) : null}
                   </SignedIn>
+                  <button
+                    type="button"
+                    onClick={openTutorial}
+                    className="pixel-button mt-4 w-full rounded-none bg-sky px-4 py-3 font-display text-[10px] uppercase text-ink sm:text-xs"
+                  >
+                    Tutorial
+                  </button>
                 </div>
                 <SignedIn>
                   <div className="bg-parchment p-3 text-ink">
@@ -873,18 +1109,30 @@ export function GameShell() {
               {!save && (
                 <div className="mt-8 space-y-6">
                   <div className="space-y-5 bg-ink/50 p-5">
-                    <p className="font-display text-xs uppercase leading-relaxed text-gold">Begin the story</p>
+                    <p className="font-display text-xs uppercase leading-relaxed text-gold">Welcome to Four Years</p>
                     <p className="text-3xl leading-8 text-parchment sm:text-4xl sm:leading-10">
                       Freshman year starts with uncertainty, and the version of you that survives it will be shaped one semester at a time.
                     </p>
+                    <p className="text-2xl leading-7 text-parchment/80">
+                      Start with the tutorial if you want a guided tour of the planner, stats, relationships, phone, and yearbook before you make your first choice.
+                    </p>
                   </div>
-                  <button
-                    type="button"
-                    onClick={startGame}
-                    className="pixel-button rounded-none bg-coral px-6 py-4 font-display text-xs uppercase text-ink"
-                  >
-                    Start the Semester
-                  </button>
+                  <div className="flex flex-wrap gap-4">
+                    <button
+                      type="button"
+                      onClick={openTutorial}
+                      className="pixel-button rounded-none bg-gold px-6 py-4 font-display text-xs uppercase text-ink"
+                    >
+                      Start with Tutorial
+                    </button>
+                    <button
+                      type="button"
+                      onClick={startGame}
+                      className="pixel-button rounded-none bg-coral px-6 py-4 font-display text-xs uppercase text-ink"
+                    >
+                      Start the Semester
+                    </button>
+                  </div>
                   <p className="text-2xl text-parchment/80">This save will belong to {getPlayerName(user)} and carry forward across future semesters.</p>
                 </div>
               )}
@@ -1022,20 +1270,16 @@ export function GameShell() {
                 </div>
               )}
 
-              {save ? <div className="mt-8"><YearbookArchive entries={archiveEntries} /></div> : null}
+              <div className={clsx("mt-8", tutorialTargetClass("yearbook"))} data-tutorial-target="yearbook">
+                <YearbookArchive entries={archiveEntries} />
+              </div>
 
             </SignedIn>
           </div>
         </section>
 
         <aside className="space-y-6">
-          <section className="pixel-panel bg-parchment p-5 text-ink">
-            <p className="font-display text-xs uppercase leading-relaxed text-ink">Current flavor</p>
-            <p className="mt-4 text-3xl leading-8">{flavor.loading ? "Writing the moment..." : flavor.text}</p>
-            <p className="mt-4 text-xl uppercase tracking-[0.18em] text-ink/70">Dialogue source: {flavor.provider}</p>
-          </section>
-
-          <section className="pixel-panel bg-ink/85 p-5">
+          <section data-tutorial-target="stats" className={clsx("pixel-panel bg-ink/85 p-5", tutorialTargetClass("stats"))}>
             <p className="font-display text-xs uppercase leading-relaxed text-gold">Cumulative stats</p>
             <div className="mt-5 space-y-5">
               <StatMeter label="Academics" value={(save?.step === "planner" ? previewStats.academics : save?.stats.academics) ?? DEFAULT_STATS.academics} color={statColors.academics} />
@@ -1045,32 +1289,42 @@ export function GameShell() {
             </div>
           </section>
 
-          {save ? (
-            <section className="pixel-panel bg-ink/85 p-5">
-              <p className="font-display text-xs uppercase leading-relaxed text-sky">Relationships</p>
-              <div className="mt-5 space-y-5">
-                {(Object.keys(save.relationships) as RelationshipKey[]).map((key) => (
-                  <RelationshipMeter
-                    key={key}
-                    label={relationshipLabels[key]}
-                    value={save.relationships[key]}
-                    color={relationshipColors[key]}
-                  />
-                ))}
-              </div>
-            </section>
-          ) : null}
+          <div data-tutorial-target="relationships" className={tutorialTargetClass("relationships")}>
+            {save ? (
+              <section className="pixel-panel bg-ink/85 p-5">
+                <p className="font-display text-xs uppercase leading-relaxed text-sky">Relationships</p>
+                <div className="mt-5 space-y-5">
+                  {(Object.keys(save.relationships) as RelationshipKey[]).map((key) => (
+                    <RelationshipMeter
+                      key={key}
+                      label={relationshipLabels[key]}
+                      value={save.relationships[key]}
+                      color={relationshipColors[key]}
+                    />
+                  ))}
+                </div>
+              </section>
+            ) : (
+              <RelationshipPreviewPanel />
+            )}
+          </div>
 
-          {save ? (
-            <PhonePanel
-              save={save}
-              selectedThreadId={selectedPhoneThreadId}
-              onSelectThread={setSelectedPhoneThreadId}
-              onChooseThreadReply={handlePhoneChoice}
-            />
-          ) : null}
+          <div data-tutorial-target="phone" className={tutorialTargetClass("phone")}>
+            {save ? (
+              <PhonePanel
+                save={save}
+                selectedThreadId={selectedPhoneThreadId}
+                onSelectThread={setSelectedPhoneThreadId}
+                onChooseThreadReply={handlePhoneChoice}
+              />
+            ) : (
+              <PhonePreviewPanel />
+            )}
+          </div>
 
-          <CampusMap visited={visitedLocationIds} activeLocationId={currentScene?.locationId} />
+          <div data-tutorial-target="map" className={tutorialTargetClass("map")}>
+            <CampusMap visited={visitedLocationIds} activeLocationId={currentScene?.locationId} />
+          </div>
 
           <PixelDormAnimation />
         </aside>
