@@ -668,6 +668,10 @@ export function getPhoneThreads(save: SaveData): PhoneThreadDefinition[] {
     return [derekThread, minaThread, homeFriendsThread];
   }
 
+  if (save.currentSemesterId === "senior-spring") {
+    return [derekThread, minaThread, homeFriendsThread];
+  }
+
   return [];
 }
 
