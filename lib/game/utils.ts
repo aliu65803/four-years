@@ -66,14 +66,30 @@ export function getSaveStorageKey(userId: string) {
 }
 
 export function clampStat(value: number) {
-  return Math.max(0, Math.min(100, value));
+  return Math.round(Math.max(0, Math.min(100, value)));
+}
+
+function applyStatDelta(currentValue: number, delta: number) {
+  if (delta === 0) {
+    return currentValue;
+  }
+
+  if (delta > 0) {
+    const headroomRatio = (100 - currentValue) / 100;
+    const scaledDelta = delta * headroomRatio;
+    return clampStat(currentValue + scaledDelta);
+  }
+
+  const pressureRatio = 0.65 + currentValue / 100;
+  const scaledDelta = delta * pressureRatio;
+  return clampStat(currentValue + scaledDelta);
 }
 
 export function applyEffects(stats: Stats, effects: Partial<Stats>) {
   const nextStats = { ...stats };
 
   (Object.keys(effects) as StatKey[]).forEach((key) => {
-    nextStats[key] = clampStat(nextStats[key] + (effects[key] ?? 0));
+    nextStats[key] = applyStatDelta(nextStats[key], effects[key] ?? 0);
   });
 
   return nextStats;
