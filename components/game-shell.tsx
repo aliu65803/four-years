@@ -1279,6 +1279,12 @@ export function GameShell() {
         </section>
 
         <aside className="space-y-6">
+          <div data-tutorial-target="map" className={tutorialTargetClass("map")}>
+            <CampusMap visited={visitedLocationIds} activeLocationId={currentScene?.locationId} />
+          </div>
+
+          <PixelDormAnimation />
+
           <section data-tutorial-target="stats" className={clsx("pixel-panel bg-ink/85 p-5", tutorialTargetClass("stats"))}>
             <p className="font-display text-xs uppercase leading-relaxed text-gold">Cumulative stats</p>
             <div className="mt-5 space-y-5">
@@ -1321,12 +1327,6 @@ export function GameShell() {
               <PhonePreviewPanel />
             )}
           </div>
-
-          <div data-tutorial-target="map" className={tutorialTargetClass("map")}>
-            <CampusMap visited={visitedLocationIds} activeLocationId={currentScene?.locationId} />
-          </div>
-
-          <PixelDormAnimation />
         </aside>
       </div>
     </main>
