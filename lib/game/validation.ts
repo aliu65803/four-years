@@ -100,6 +100,17 @@ function normalizeCommunication(value: unknown) {
   };
 }
 
+function normalizeCommunicationThreadIds(value: unknown) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .filter((entry): entry is string => typeof entry === "string")
+    .filter((entry) => entry === "homeFriends" || entry === "mina" || entry === "derek")
+    .slice(0, 3);
+}
+
 export function getBodySizeBytes(body: unknown) {
   return Buffer.byteLength(JSON.stringify(body ?? {}), "utf8");
 }
@@ -189,6 +200,7 @@ export function validateSaveData(body: unknown, userId: string) {
     stats: normalizeStats(body.stats),
     relationships: normalizeRelationships(body.relationships),
     communication: normalizeCommunication(body.communication),
+    semesterTextedThreadIds: normalizeCommunicationThreadIds(body.semesterTextedThreadIds),
     sceneIndex: Math.max(0, Math.min(8, Number(body.sceneIndex) || 0)),
     phoneThreadIndex: Math.max(0, Math.min(4, Number(body.phoneThreadIndex) || 0)),
     choiceHistory,

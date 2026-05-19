@@ -19,7 +19,7 @@ import {
   Stats
 } from "@/lib/game/types";
 
-export const SAVE_VERSION = 4;
+export const SAVE_VERSION = 5;
 
 type PhoneChoice = {
   id: string;
@@ -163,6 +163,7 @@ export function createNewSave(playerName: string, playerId: string): SaveData {
       mina: { ...DEFAULT_COMMUNICATION.mina },
       derek: { ...DEFAULT_COMMUNICATION.derek }
     },
+    semesterTextedThreadIds: [],
     sceneIndex: 0,
     phoneThreadIndex: 0,
     choiceHistory: [],
@@ -514,14 +515,13 @@ export function getPhoneThreads(save: SaveData): PhoneThreadDefinition[] {
         threadEffects: { homeFriends: { sent: 1 } }
       },
       {
-        id: "home-friends-ignore",
-        label: "Leave it unread a little longer",
-        description: "Put off the ache of answering.",
-        previewReply: "...",
-        statEffects: { mental: -2 },
-        relationshipEffects: { homeFriends: -5 },
-        threadEffects: { homeFriends: { ignored: 1 } },
-        flags: ["let_home_drift"]
+        id: "home-friends-voice-note",
+        label: "Send a quick voice note",
+        description: "Make contact even if you cannot do the full emotional version tonight.",
+        previewReply: "I’m in transit and weirdly emotional, but I do love you all. I’ll call when I’m less scattered.",
+        statEffects: { social: 1, mental: 1 },
+        relationshipEffects: { homeFriends: 3 },
+        threadEffects: { homeFriends: { sent: 1 } }
       }
     ]
   };
@@ -563,14 +563,13 @@ export function getPhoneThreads(save: SaveData): PhoneThreadDefinition[] {
         threadEffects: { mina: { sent: 1 } }
       },
       {
-        id: "mina-put-it-off",
-        label: "Tell yourself you’ll answer later",
-        description: "Assume the friendship can carry the silence.",
-        previewReply: "...",
-        statEffects: { mental: -1 },
-        relationshipEffects: { mina: -4 },
-        threadEffects: { mina: { ignored: 1 } },
-        flags: ["let_new_friends_drift"]
+        id: "mina-soft-check-in",
+        label: "Send a softer check-in",
+        description: "Stay present without turning it into a whole conversation.",
+        previewReply: "I’m here. Brain is scrambled, but I did smile when I saw your text.",
+        statEffects: { mental: 1, social: 1 },
+        relationshipEffects: { mina: 3 },
+        threadEffects: { mina: { sent: 1 } }
       }
     ]
   };
@@ -612,14 +611,13 @@ export function getPhoneThreads(save: SaveData): PhoneThreadDefinition[] {
         threadEffects: { derek: { sent: 1 } }
       },
       {
-        id: "derek-silence",
-        label: "Leave the message sitting",
-        description: "Protect yourself by not deepening the thread tonight.",
-        previewReply: "...",
-        statEffects: { mental: -1 },
-        relationshipEffects: { derek: -5 },
-        threadEffects: { derek: { ignored: 1 } },
-        flags: ["kept_love_at_distance"]
+        id: "derek-playful-reply",
+        label: "Send a playful reply",
+        description: "Keep the thread alive without having to define the whole feeling yet.",
+        previewReply: "That was suspiciously sincere of you. I’m filing it away for later leverage.",
+        statEffects: { social: 1, mental: 1 },
+        relationshipEffects: { derek: 3 },
+        threadEffects: { derek: { sent: 1 } }
       }
     ]
   };
@@ -655,8 +653,12 @@ export function getPhoneThreads(save: SaveData): PhoneThreadDefinition[] {
   return [];
 }
 
-export function getCurrentPhoneThread(save: SaveData) {
-  return getPhoneThreads(save)[save.phoneThreadIndex] ?? null;
+export function getPhoneThreadById(save: SaveData, threadId: CommunicationThreadKey | null) {
+  if (!threadId) {
+    return null;
+  }
+
+  return getPhoneThreads(save).find((thread) => thread.id === threadId) ?? null;
 }
 
 function hasFlag(save: SaveData, flag: string) {
@@ -802,7 +804,7 @@ export function buildMemoryArchive(save: SaveData): ArchiveEntry[] {
   });
 
   const shouldIncludeCurrent =
-    save.step === "summary" || save.step === "phone" || (save.currentSemesterId === "senior-spring" && save.step === "reflection");
+    save.step === "summary" || (save.currentSemesterId === "senior-spring" && save.step === "reflection");
 
   if (shouldIncludeCurrent) {
     const semester = getSemesterDefinition(save.currentSemesterId);
@@ -865,6 +867,10 @@ export function getNextSemesterId(currentSemesterId: SemesterId) {
 }
 
 export function normalizeSave(rawSave: SaveData): SaveData {
+  const normalizedStep = rawSave.step === "phone" ? "arrival" : rawSave.step;
+  const normalizedCurrentSemesterId =
+    rawSave.step === "phone" && rawSave.pendingSemesterId ? rawSave.pendingSemesterId : rawSave.currentSemesterId ?? "freshman-fall";
+
   if (
     rawSave.version >= SAVE_VERSION &&
     rawSave.currentSemesterId &&
@@ -872,8 +878,10 @@ export function normalizeSave(rawSave: SaveData): SaveData {
     typeof rawSave.relationships.derek === "number" &&
     rawSave.semesterHistory &&
     rawSave.communication &&
+    Array.isArray(rawSave.semesterTextedThreadIds) &&
     typeof rawSave.phoneThreadIndex === "number" &&
-    Array.isArray(rawSave.storyFlags)
+    Array.isArray(rawSave.storyFlags) &&
+    rawSave.step !== "phone"
   ) {
     return rawSave;
   }
@@ -882,9 +890,9 @@ export function normalizeSave(rawSave: SaveData): SaveData {
     version: SAVE_VERSION,
     playerName: rawSave.playerName,
     playerId: rawSave.playerId,
-    currentSemesterId: rawSave.currentSemesterId ?? "freshman-fall",
-    pendingSemesterId: rawSave.pendingSemesterId ?? null,
-    step: rawSave.step,
+    currentSemesterId: normalizedCurrentSemesterId,
+    pendingSemesterId: null,
+    step: normalizedStep,
     focusIds: rawSave.focusIds ?? [],
     stats: rawSave.stats ?? { ...DEFAULT_STATS },
     relationships: { ...DEFAULT_RELATIONSHIPS, ...(rawSave.relationships ?? {}) },
@@ -893,6 +901,7 @@ export function normalizeSave(rawSave: SaveData): SaveData {
       mina: { ...DEFAULT_COMMUNICATION.mina, ...(rawSave.communication?.mina ?? {}) },
       derek: { ...DEFAULT_COMMUNICATION.derek, ...(rawSave.communication?.derek ?? {}) }
     },
+    semesterTextedThreadIds: rawSave.semesterTextedThreadIds ?? [],
     sceneIndex: rawSave.sceneIndex ?? 0,
     phoneThreadIndex: rawSave.phoneThreadIndex ?? 0,
     choiceHistory: rawSave.choiceHistory ?? [],
@@ -915,17 +924,59 @@ export function normalizeSave(rawSave: SaveData): SaveData {
   };
 }
 
+function applyRelationshipDecayForUntextedThreads(save: SaveData) {
+  const availableThreads = getPhoneThreads(save).map((thread) => thread.id);
+  const untouchedThreads = availableThreads.filter((threadId) => !save.semesterTextedThreadIds.includes(threadId));
+
+  if (untouchedThreads.length === 0) {
+    return {
+      relationships: save.relationships,
+      communication: save.communication
+    };
+  }
+
+  const decayEffects: Partial<Relationships> = {};
+  let nextCommunication: CommunicationHistory = {
+    homeFriends: { ...save.communication.homeFriends },
+    mina: { ...save.communication.mina },
+    derek: { ...save.communication.derek }
+  };
+
+  untouchedThreads.forEach((threadId) => {
+    decayEffects[threadId] = -4;
+    nextCommunication = applyCommunicationEffects(
+      nextCommunication,
+      {
+        [threadId]: { ignored: 1 }
+      },
+      `untouched-${save.currentSemesterId}`,
+      threadId
+    );
+  });
+
+  return {
+    relationships: applyRelationshipEffects(save.relationships, decayEffects),
+    communication: nextCommunication
+  };
+}
+
 export function buildSemesterAdvance(save: SaveData): SaveData | null {
   const nextSemesterId = getNextSemesterId(save.currentSemesterId);
   if (!nextSemesterId) {
     return null;
   }
 
+  const decayed = applyRelationshipDecayForUntextedThreads(save);
+
   return {
     ...save,
-    pendingSemesterId: nextSemesterId,
-    step: "phone" as const,
+    currentSemesterId: nextSemesterId,
+    pendingSemesterId: null,
+    step: "arrival" as const,
     focusIds: [],
+    relationships: decayed.relationships,
+    communication: decayed.communication,
+    semesterTextedThreadIds: [],
     sceneIndex: 0,
     phoneThreadIndex: 0,
     choiceHistory: [],
@@ -940,21 +991,6 @@ export function buildSemesterAdvance(save: SaveData): SaveData | null {
         completedAt: new Date().toISOString()
       }
     ],
-    updatedAt: new Date().toISOString()
-  };
-}
-
-export function finishPhoneStep(save: SaveData): SaveData | null {
-  if (!save.pendingSemesterId) {
-    return null;
-  }
-
-  return {
-    ...save,
-    currentSemesterId: save.pendingSemesterId,
-    pendingSemesterId: null,
-    step: "arrival",
-    phoneThreadIndex: 0,
     updatedAt: new Date().toISOString()
   };
 }

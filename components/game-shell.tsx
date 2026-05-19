@@ -6,11 +6,12 @@ import clsx from "clsx";
 import { SignInButton, SignUpButton, SignedIn, SignedOut, UserButton, useUser } from "@clerk/nextjs";
 import {
   DEFAULT_STATS,
+  communicationLabels,
   relationshipLabels,
   semesterDefinitions,
   semesterFocuses
 } from "@/lib/game/data";
-import { RelationshipKey, SaveData, SceneChoice, SceneDefinition, Stats } from "@/lib/game/types";
+import { CommunicationThreadKey, RelationshipKey, SaveData, SceneChoice, SceneDefinition, Stats } from "@/lib/game/types";
 import {
   applyCommunicationEffects,
   applyEffects,
@@ -22,8 +23,8 @@ import {
   createNewSave,
   describeCommunication,
   describeRelationships,
-  finishPhoneStep,
-  getCurrentPhoneThread,
+  getPhoneThreadById,
+  getPhoneThreads,
   getNextSemesterId,
   getSaveStorageKey,
   getSceneFromPlan,
@@ -208,6 +209,100 @@ function RelationshipMeter({
   );
 }
 
+function PhonePanel({
+  save,
+  selectedThreadId,
+  onSelectThread,
+  onChooseThreadReply
+}: {
+  save: SaveData;
+  selectedThreadId: CommunicationThreadKey | null;
+  onSelectThread: (threadId: CommunicationThreadKey) => void;
+  onChooseThreadReply: (threadId: CommunicationThreadKey, choiceId: string) => void;
+}) {
+  const threads = getPhoneThreads(save);
+  const selectedThread = getPhoneThreadById(save, selectedThreadId ?? threads[0]?.id ?? null);
+
+  if (threads.length === 0 || !selectedThread) {
+    return null;
+  }
+
+  const threadCompleted = save.semesterTextedThreadIds.includes(selectedThread.id);
+
+  return (
+    <section className="pixel-panel bg-[#243451] p-5 text-parchment">
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <p className="font-display text-xs uppercase leading-relaxed text-sky">Phone</p>
+          <p className="mt-3 text-2xl leading-6 text-parchment/90">Text who you want to keep close this semester. Anyone you leave untouched will cool off a little when the term ends.</p>
+        </div>
+        <div className="rounded-none border-2 border-parchment/40 bg-[#172238] px-3 py-2 text-xl uppercase tracking-[0.18em] text-gold">
+          {save.semesterTextedThreadIds.length}/{threads.length}
+        </div>
+      </div>
+
+      <div className="mt-5 grid gap-4 lg:grid-cols-[0.42fr_0.58fr]">
+        <div className="space-y-3">
+          {threads.map((thread) => {
+            const replied = save.semesterTextedThreadIds.includes(thread.id);
+
+            return (
+              <button
+                key={thread.id}
+                type="button"
+                onClick={() => onSelectThread(thread.id)}
+                className={clsx(
+                  "pixel-button flex w-full items-center justify-between rounded-none px-4 py-3 text-left",
+                  selectedThread.id === thread.id ? "bg-teal text-ink" : "bg-parchment text-ink"
+                )}
+              >
+                <div>
+                  <p className="font-display text-xs uppercase leading-relaxed">{communicationLabels[thread.id]}</p>
+                  <p className="mt-2 text-xl leading-5">{replied ? "Replied this semester" : "Still waiting"}</p>
+                </div>
+                <span className="text-xl uppercase tracking-[0.14em]">{replied ? "Sent" : "Open"}</span>
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="space-y-4 bg-ink/45 p-4">
+          <p className="font-display text-xs uppercase leading-relaxed text-gold">{selectedThread.from}</p>
+          <p className="text-2xl text-parchment/85">{selectedThread.intro}</p>
+          <div className="space-y-3">
+            {selectedThread.messages.map((message, index) => (
+              <div
+                key={`${selectedThread.id}-${index}`}
+                className={clsx("max-w-[26rem] p-4 text-2xl leading-6", index === 0 ? "ml-auto bg-teal text-ink" : "bg-parchment text-ink")}
+              >
+                {message}
+              </div>
+            ))}
+          </div>
+
+          {threadCompleted ? (
+            <div className="border-2 border-parchment/40 bg-[#172238] p-4 text-2xl leading-6 text-parchment/85">
+              You already texted {communicationLabels[selectedThread.id]} this semester. Let the thread rest for now.
+            </div>
+          ) : (
+            <div className="grid gap-4">
+              {selectedThread.choices.map((choice) => (
+                <PhoneChoiceCard
+                  key={choice.id}
+                  label={choice.label}
+                  description={choice.description}
+                  previewReply={choice.previewReply}
+                  onChoose={() => onChooseThreadReply(selectedThread.id, choice.id)}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function PixelDormAnimation() {
   return (
     <section className="pixel-panel overflow-hidden bg-[#243451] p-5 text-parchment">
@@ -322,6 +417,7 @@ export function GameShell() {
   const [save, setSave] = useState<SaveData | null>(null);
   const [hydrated, setHydrated] = useState(false);
   const [syncMessage, setSyncMessage] = useState("Sign in to sync your semester.");
+  const [selectedPhoneThreadId, setSelectedPhoneThreadId] = useState<CommunicationThreadKey | null>(null);
   const [flavor, setFlavor] = useState<FlavorState>({
     text: "Welcome to move-in day. The year is about to start making choices back at you.",
     provider: "fallback",
@@ -404,11 +500,11 @@ export function GameShell() {
   const semester = useMemo(() => (save ? getSemesterDefinition(save.currentSemesterId) : semesterDefinitions["freshman-fall"]), [save]);
   const scenePlan = useMemo(() => (save ? getSemesterScenePlan(save) : []), [save]);
   const currentScene = useMemo(() => (save ? getSceneFromPlan(save, save.sceneIndex) : null), [save]);
-  const currentPhoneThread = useMemo(() => (save ? getCurrentPhoneThread(save) : null), [save]);
   const visitedLocationIds = useMemo(() => (save ? getVisitedLocationIds(save) : new Set<string>()), [save]);
   const nextSemesterId = useMemo(() => (save ? getNextSemesterId(save.currentSemesterId) : null), [save]);
   const endingCard = useMemo(() => (save?.currentSemesterId === "senior-spring" && save.step === "summary" ? buildEndingCard(save) : null), [save]);
   const archiveEntries = useMemo(() => (save ? buildMemoryArchive(save) : []), [save]);
+  const availablePhoneThreads = useMemo(() => (save ? getPhoneThreads(save) : []), [save]);
 
   const previewStats = useMemo(() => {
     if (!save) {
@@ -420,6 +516,23 @@ export function GameShell() {
       return focus ? applyEffects(acc, focus.statEffects) : acc;
     }, { ...save.stats });
   }, [save]);
+
+  useEffect(() => {
+    if (!save) {
+      setSelectedPhoneThreadId(null);
+      return;
+    }
+
+    const availableThreadIds = availablePhoneThreads.map((thread) => thread.id);
+    if (availableThreadIds.length === 0) {
+      setSelectedPhoneThreadId(null);
+      return;
+    }
+
+    if (!selectedPhoneThreadId || !availableThreadIds.includes(selectedPhoneThreadId)) {
+      setSelectedPhoneThreadId(availableThreadIds[0]);
+    }
+  }, [availablePhoneThreads, save, selectedPhoneThreadId]);
 
   const startGame = () => {
     if (!user) {
@@ -539,13 +652,18 @@ export function GameShell() {
     });
   };
 
-  const handlePhoneChoice = (choiceId: string) => {
-    if (!save || save.step !== "phone" || !currentPhoneThread) {
+  const handlePhoneChoice = (threadId: CommunicationThreadKey, choiceId: string) => {
+    if (!save) {
       return;
     }
 
-    const choice = currentPhoneThread.choices.find((entry) => entry.id === choiceId);
-    if (!choice) {
+    if (save.semesterTextedThreadIds.includes(threadId)) {
+      return;
+    }
+
+    const currentPhoneThread = getPhoneThreadById(save, threadId);
+    const choice = currentPhoneThread?.choices.find((entry) => entry.id === choiceId);
+    if (!choice || !currentPhoneThread) {
       return;
     }
 
@@ -557,38 +675,18 @@ export function GameShell() {
       choice.id,
       currentPhoneThread.id
     );
-    const nextThreadIndex = save.phoneThreadIndex + 1;
 
     setSave({
       ...save,
       stats: nextStats,
       relationships: nextRelationships,
       communication: nextCommunication,
-      phoneThreadIndex: nextThreadIndex,
+      semesterTextedThreadIds: [...save.semesterTextedThreadIds, threadId],
       storyFlags: [...new Set([...save.storyFlags, choice.id, ...(choice.flags ?? [])])],
       updatedAt: new Date().toISOString()
     });
     setFlavor({
       text: choice.previewReply === "..." ? "You let the silence carry more than the message did." : choice.previewReply,
-      provider: "fallback",
-      loading: false
-    });
-  };
-
-  const continueFromPhone = () => {
-    if (!save) {
-      return;
-    }
-
-    const advanced = finishPhoneStep(save);
-    if (!advanced) {
-      return;
-    }
-
-    setSave(advanced);
-    const nextSemester = getSemesterDefinition(advanced.currentSemesterId);
-    setFlavor({
-      text: `${save.playerName} returns for ${nextSemester.title.toLowerCase()} with a few more answered messages and a slightly clearer sense of who still feels reachable.`,
       provider: "fallback",
       loading: false
     });
@@ -619,7 +717,7 @@ export function GameShell() {
     setSave(advanced);
     const nextSemester = getSemesterDefinition(advanced.currentSemesterId);
     setFlavor({
-      text: `${save.playerName} returns for ${nextSemester.title.toLowerCase()}. They know the campus better now, but the people in it have become harder to read.`,
+      text: `${save.playerName} returns for ${nextSemester.title.toLowerCase()}. Some connections feel steadier because you fed them. The neglected ones are harder to pretend about now.`,
       provider: "fallback",
       loading: false
     });
@@ -827,7 +925,7 @@ export function GameShell() {
                         onClick={advanceSemester}
                         className="pixel-button rounded-none bg-teal px-6 py-4 font-display text-xs uppercase text-ink"
                       >
-                        Check Your Phone
+                        Start {getSemesterDefinition(nextSemesterId).title}
                       </button>
                     ) : null}
                     <button
@@ -841,60 +939,6 @@ export function GameShell() {
                 </div>
               )}
 
-              {save?.step === "phone" && currentPhoneThread && (
-                <div className="mt-8 space-y-6">
-                  <div className="relative overflow-hidden border-4 border-parchment/60 bg-[#253759]">
-                    <Image src="/backgrounds/phone-glow.svg" alt={currentPhoneThread.title} width={1200} height={800} className="h-[320px] w-full object-cover" />
-                    <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-ink to-transparent p-4">
-                      <p className="font-display text-[10px] uppercase leading-relaxed text-sky sm:text-xs">Between semesters</p>
-                      <h2 className="mt-2 text-3xl uppercase tracking-[0.12em] text-parchment sm:text-4xl">{currentPhoneThread.title}</h2>
-                    </div>
-                  </div>
-                  <div className="space-y-4 bg-ink/55 p-5">
-                    <p className="font-display text-xs uppercase leading-relaxed text-gold">{currentPhoneThread.from}</p>
-                    <p className="text-2xl text-parchment/85">{currentPhoneThread.intro}</p>
-                    <div className="space-y-3">
-                      {currentPhoneThread.messages.map((message, index) => (
-                        <div key={`${currentPhoneThread.id}-${index}`} className={clsx("max-w-[34rem] p-4 text-2xl leading-6", index === 0 ? "ml-auto bg-teal text-ink" : "bg-parchment text-ink")}>
-                          {message}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="grid gap-4">
-                    {currentPhoneThread.choices.map((choice) => (
-                      <PhoneChoiceCard
-                        key={choice.id}
-                        label={choice.label}
-                        description={choice.description}
-                        previewReply={choice.previewReply}
-                        onChoose={() => handlePhoneChoice(choice.id)}
-                      />
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {save?.step === "phone" && !currentPhoneThread && save.pendingSemesterId && (
-                <div className="mt-8 space-y-6">
-                  <div className="space-y-4 bg-ink/55 p-5">
-                    <p className="font-display text-xs uppercase leading-relaxed text-sky">Between semesters</p>
-                    <p className="text-3xl leading-8 text-parchment sm:text-4xl sm:leading-10">
-                      The break passed through calls, half-kept plans, and the quiet proof that some connections survived because you acted like they mattered.
-                    </p>
-                    <p className="text-2xl text-parchment/85">
-                      Next up: {getSemesterDefinition(save.pendingSemesterId).title}.
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={continueFromPhone}
-                    className="pixel-button rounded-none bg-gold px-6 py-4 font-display text-xs uppercase text-ink"
-                  >
-                    Return to Campus
-                  </button>
-                </div>
-              )}
             </SignedIn>
           </div>
         </section>
@@ -930,6 +974,15 @@ export function GameShell() {
                 ))}
               </div>
             </section>
+          ) : null}
+
+          {save ? (
+            <PhonePanel
+              save={save}
+              selectedThreadId={selectedPhoneThreadId}
+              onSelectThread={setSelectedPhoneThreadId}
+              onChooseThreadReply={handlePhoneChoice}
+            />
           ) : null}
 
           {save ? <YearbookArchive entries={archiveEntries} /> : null}

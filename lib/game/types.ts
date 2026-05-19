@@ -87,6 +87,7 @@ export type SaveData = {
   stats: Stats;
   relationships: Relationships;
   communication: CommunicationHistory;
+  semesterTextedThreadIds: CommunicationThreadKey[];
   sceneIndex: number;
   phoneThreadIndex: number;
   choiceHistory: {
