@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import clsx from "clsx";
 import { SignInButton, SignUpButton, SignedIn, SignedOut, UserButton, useUser } from "@clerk/nextjs";
@@ -56,14 +56,16 @@ const relationshipColors: Record<RelationshipKey, string> = {
 };
 
 function StatMeter({ label, value, color }: { label: string; value: number; color: string }) {
+  const roundedValue = Math.round(value);
+
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between text-xl uppercase tracking-[0.18em] text-parchment">
         <span>{label}</span>
-        <span>{value}</span>
+        <span>{roundedValue}</span>
       </div>
       <div className="h-5 border-2 border-ink bg-ink/60">
-        <div className={clsx("h-full transition-all duration-500", color)} style={{ width: `${value}%` }} />
+        <div className={clsx("h-full transition-all duration-500", color)} style={{ width: `${roundedValue}%` }} />
       </div>
     </div>
   );
@@ -417,12 +419,15 @@ export function GameShell() {
   const [save, setSave] = useState<SaveData | null>(null);
   const [hydrated, setHydrated] = useState(false);
   const [syncMessage, setSyncMessage] = useState("Sign in to sync your semester.");
+  const [isSaving, setIsSaving] = useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [selectedPhoneThreadId, setSelectedPhoneThreadId] = useState<CommunicationThreadKey | null>(null);
   const [flavor, setFlavor] = useState<FlavorState>({
     text: "Welcome to move-in day. The year is about to start making choices back at you.",
     provider: "fallback",
     loading: false
   });
+  const lastPersistedSnapshotRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!isLoaded) {
@@ -432,70 +437,127 @@ export function GameShell() {
     if (!user) {
       setSave(null);
       setHydrated(true);
+      setHasUnsavedChanges(false);
+      lastPersistedSnapshotRef.current = null;
       setSyncMessage("Sign in to sync your semester.");
       return;
     }
 
     const storageKey = getSaveStorageKey(user.id);
     const rawSave = window.localStorage.getItem(storageKey);
+    let cancelled = false;
 
     if (rawSave) {
       try {
-        setSave(normalizeSave(JSON.parse(rawSave) as SaveData));
+        const normalized = normalizeSave(JSON.parse(rawSave) as SaveData);
+        setSave(normalized);
+        lastPersistedSnapshotRef.current = JSON.stringify(normalized);
+        setHydrated(true);
+        setSyncMessage("Loaded local save. Checking online save...");
       } catch {
         window.localStorage.removeItem(storageKey);
       }
     }
 
     const loadSave = async () => {
-      const response = await fetch("/api/save");
-      if (!response.ok) {
-        setHydrated(true);
-        return;
-      }
+      const controller = new AbortController();
+      const timeoutId = window.setTimeout(() => controller.abort(), 4500);
 
-      const result = (await response.json()) as { save: SaveData | null };
-      if (result.save) {
-        const normalized = normalizeSave(result.save);
-        setSave(normalized);
-        window.localStorage.setItem(storageKey, JSON.stringify(normalized));
-        setSyncMessage("Supabase save loaded.");
-      } else if (rawSave) {
-        setSyncMessage("Loaded local save. Remote slot is still empty.");
-      } else {
-        setSyncMessage("No save yet. Start your first semester.");
+      try {
+        const response = await fetch("/api/save", { signal: controller.signal });
+        if (!response.ok) {
+          if (!cancelled) {
+            if (rawSave) {
+              setSyncMessage("Loaded local save. Press Save Progress to sync online.");
+            } else {
+              setSyncMessage("No save yet. Start your first semester.");
+            }
+          }
+          return;
+        }
+
+        const result = (await response.json()) as { save: SaveData | null };
+        if (cancelled) {
+          return;
+        }
+
+        if (result.save) {
+          const normalized = normalizeSave(result.save);
+          setSave(normalized);
+          window.localStorage.setItem(storageKey, JSON.stringify(normalized));
+          lastPersistedSnapshotRef.current = JSON.stringify(normalized);
+          setSyncMessage("Save loaded. Manual saving is on.");
+        } else if (rawSave) {
+          setSyncMessage("Loaded local save. Press Save Progress to sync online.");
+        } else {
+          setSyncMessage("No save yet. Start your first semester.");
+        }
+      } catch {
+        if (!cancelled) {
+          setSyncMessage(rawSave ? "Loaded local save. Online save check timed out." : "Online save check timed out. You can still start a new semester.");
+        }
+      } finally {
+        window.clearTimeout(timeoutId);
+        if (!cancelled) {
+          setHydrated(true);
+        }
       }
-      setHydrated(true);
     };
 
     void loadSave();
+
+    return () => {
+      cancelled = true;
+    };
   }, [isLoaded, user]);
 
   useEffect(() => {
-    if (!save || !user) {
+    if (!save) {
+      setHasUnsavedChanges(false);
       return;
     }
 
-    window.localStorage.setItem(getSaveStorageKey(user.id), JSON.stringify(save));
+    setHasUnsavedChanges(JSON.stringify(save) !== lastPersistedSnapshotRef.current);
+  }, [save]);
 
-    const persist = async () => {
+  const handleManualSave = async () => {
+    if (!save || !user || isSaving) {
+      return;
+    }
+
+    const snapshot = JSON.stringify(save);
+    setIsSaving(true);
+    setSyncMessage("Saving progress...");
+
+    window.localStorage.setItem(getSaveStorageKey(user.id), snapshot);
+
+    try {
       const response = await fetch("/api/save", {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
         },
-        body: JSON.stringify(save)
+        body: snapshot
       });
 
       const result = (await response.json()) as { persisted: boolean; reason?: string };
-      setSyncMessage(result.persisted ? "Supabase save synced." : "Saved locally. Add Clerk and Supabase env vars to sync online.");
-      if (result.reason && result.reason !== "missing-env") {
-        setSyncMessage(`Saved locally. Remote sync skipped: ${result.reason}`);
+      if (result.persisted) {
+        lastPersistedSnapshotRef.current = snapshot;
+        setHasUnsavedChanges(false);
+        setSyncMessage("Progress saved.");
+      } else if (result.reason === "missing-env") {
+        lastPersistedSnapshotRef.current = snapshot;
+        setHasUnsavedChanges(false);
+        setSyncMessage("Saved locally. Add Clerk and Supabase env vars to sync online.");
+      } else {
+        setSyncMessage(`Save skipped: ${result.reason ?? "unknown error"}`);
       }
-    };
-
-    void persist();
-  }, [save, user]);
+    } catch {
+      setSyncMessage("Save failed. Try again in a moment.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   const semester = useMemo(() => (save ? getSemesterDefinition(save.currentSemesterId) : semesterDefinitions["freshman-fall"]), [save]);
   const scenePlan = useMemo(() => (save ? getSemesterScenePlan(save) : []), [save]);
@@ -727,6 +789,8 @@ export function GameShell() {
     if (user) {
       window.localStorage.removeItem(getSaveStorageKey(user.id));
     }
+    lastPersistedSnapshotRef.current = null;
+    setHasUnsavedChanges(false);
     setSave(null);
     setFlavor({
       text: "A different college version of you is waiting if you want to see it.",
@@ -754,6 +818,25 @@ export function GameShell() {
                 <div className="bg-parchment px-4 py-3 text-right text-ink">
                   <p className="font-display text-[10px] uppercase sm:text-xs">Save Status</p>
                   <p className="mt-2 max-w-[16rem] text-2xl leading-6">{syncMessage}</p>
+                  <SignedIn>
+                    {save ? (
+                      <button
+                        type="button"
+                        onClick={handleManualSave}
+                        disabled={isSaving}
+                        className="pixel-button mt-4 w-full rounded-none bg-coral px-4 py-3 font-display text-[10px] uppercase text-ink disabled:cursor-not-allowed disabled:bg-ink/20 disabled:text-ink/60 sm:text-xs"
+                      >
+                        {isSaving ? "Saving..." : "Save Progress"}
+                      </button>
+                    ) : null}
+                  </SignedIn>
+                  <SignedIn>
+                    {save ? (
+                      <p className="mt-3 text-base uppercase tracking-[0.18em] text-ink/70">
+                        {hasUnsavedChanges ? "Unsaved changes" : "All changes saved"}
+                      </p>
+                    ) : null}
+                  </SignedIn>
                 </div>
                 <SignedIn>
                   <div className="bg-parchment p-3 text-ink">
@@ -939,6 +1022,8 @@ export function GameShell() {
                 </div>
               )}
 
+              {save ? <div className="mt-8"><YearbookArchive entries={archiveEntries} /></div> : null}
+
             </SignedIn>
           </div>
         </section>
@@ -984,8 +1069,6 @@ export function GameShell() {
               onChooseThreadReply={handlePhoneChoice}
             />
           ) : null}
-
-          {save ? <YearbookArchive entries={archiveEntries} /> : null}
 
           <CampusMap visited={visitedLocationIds} activeLocationId={currentScene?.locationId} />
 

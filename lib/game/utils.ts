@@ -112,6 +112,24 @@ export function applyRelationshipEffects(
   return nextRelationships;
 }
 
+function normalizeStoredStats(stats: Stats) {
+  return {
+    academics: clampStat(stats.academics),
+    social: clampStat(stats.social),
+    mental: clampStat(stats.mental),
+    finances: clampStat(stats.finances)
+  };
+}
+
+function normalizeStoredRelationships(relationships: Relationships) {
+  return {
+    professorAlden: clampStat(relationships.professorAlden),
+    mina: clampStat(relationships.mina),
+    homeFriends: clampStat(relationships.homeFriends),
+    derek: clampStat(relationships.derek)
+  };
+}
+
 export function applyCommunicationEffects(
   communication: CommunicationHistory,
   effects: Partial<Record<CommunicationThreadKey, { sent?: number; ignored?: number }>> | undefined,
@@ -384,7 +402,7 @@ export function buildReflection(save: SaveData) {
         : "Some new people feel promising precisely because they do not yet know the old stories you still carry.";
     const minaText =
       save.relationships.mina >= 60
-        ? "Mina has become part of the architecture of your college life, which is exactly why keeping the friendship strong now takes intention instead of luck."
+        ? "Mina has become part of the structure of your college life, which is exactly why keeping the friendship strong now takes intention instead of luck."
         : "Not every important connection breaks loudly. Some just begin asking more maintenance than either person expected to need.";
 
     return `${derekText} ${minaText} Sophomore fall taught ${save.playerName} that confidence is not the same thing as clarity. It only gives you the courage to feel the split more fully.`;
@@ -424,7 +442,7 @@ export function buildReflection(save: SaveData) {
     const burnoutText =
       save.stats.mental <= 48
         ? "Burnout stopped being a metaphor this semester. It became something with a body, a cost, and a voice."
-        : "You held yourself together impressively this semester, but not without learning how fragile impressive can be.";
+        : "You held yourself together this semester, but not without learning how fragile that composure can be.";
 
     return `${minaText} ${burnoutText} By the end of junior spring, ${save.playerName} is no longer wondering whether adulthood is beginning. It already has.`;
   }
@@ -432,7 +450,7 @@ export function buildReflection(save: SaveData) {
   if (save.currentSemesterId === "senior-fall") {
     const derekText =
       save.relationships.derek >= 72
-        ? "Derek stopped being a campus chapter and became someone you now have to imagine in the grammar of a real life."
+        ? "Derek stopped being a campus chapter and became someone you now have to imagine in a real adult life."
         : "Love stayed real this year, but senior fall proved that even real love has to survive logistics, fear, and separate futures.";
     const minaText =
       save.relationships.mina >= 72
@@ -445,14 +463,14 @@ export function buildReflection(save: SaveData) {
   if (save.currentSemesterId === "senior-spring") {
     const futureTone =
       save.stats.finances >= 78 || save.stats.academics >= 88
-        ? "You leave college with a future sharp enough to name."
-        : "You leave college without every answer, but with a truer sense of what kind of life you can actually inhabit.";
+        ? "You leave college with a future clear enough to name."
+        : "You leave college without every answer, but with a truer sense of what kind of life you can actually live.";
     const relationshipTone =
       save.relationships.derek >= 74 && save.relationships.mina >= 72
         ? "The people you chose became part of the ending, which is another way of saying they became part of the beginning too."
         : "Not everything survived unchanged, but enough did to prove that the person you became here was real.";
 
-    return `${futureTone} ${relationshipTone} ${save.playerName} arrives at graduation understanding that adulthood is not a solved equation. It is a life you keep consenting to, one concrete choice at a time.`;
+    return `${futureTone} ${relationshipTone} ${save.playerName} arrives at graduation understanding that adulthood is not a solved equation. It is a life you keep choosing, one concrete decision at a time.`;
   }
 
   const openings: Record<StatKey, string> = {
@@ -583,12 +601,12 @@ export function getPhoneThreads(save: SaveData): PhoneThreadDefinition[] {
       ? [
           "Derek",
           "Miss your face.",
-          "Also: how do we keep being real to each other when both of our schedules are trying to become architecture?"
+          "Also: how do we stay real with each other when both of our schedules are getting this full?"
         ]
       : [
           "Derek",
           "No pressure, but I keep thinking about that last conversation.",
-          "You can text me back like a person who is curious, not like a person auditioning for certainty."
+          "You can text me back like someone who is curious, not like someone trying to have the perfect answer."
         ],
     choices: [
       {
@@ -684,7 +702,7 @@ export function buildEndingCard(save: SaveData): EndingCard {
       subtitle: "You built a future without letting it turn you into a stranger to yourself.",
       epilogue:
         "After graduation, the job offer became real, but so did dinner plans, call schedules, and the people who helped you remember that achievement only matters if a life can fit around it. Derek felt like a partner in the future, not a campus souvenir. Mina stayed part of your everyday language. Even home learned a new shape instead of disappearing.",
-      identityLine: "You left college ambitious, loved, and still inhabitable from the inside."
+      identityLine: "You left college ambitious, loved, and still someone you could live with from the inside."
     };
   }
 
@@ -883,7 +901,11 @@ export function normalizeSave(rawSave: SaveData): SaveData {
     Array.isArray(rawSave.storyFlags) &&
     rawSave.step !== "phone"
   ) {
-    return rawSave;
+    return {
+      ...rawSave,
+      stats: normalizeStoredStats(rawSave.stats),
+      relationships: normalizeStoredRelationships(rawSave.relationships)
+    };
   }
 
   const baseSave: SaveData = {
@@ -894,8 +916,8 @@ export function normalizeSave(rawSave: SaveData): SaveData {
     pendingSemesterId: null,
     step: normalizedStep,
     focusIds: rawSave.focusIds ?? [],
-    stats: rawSave.stats ?? { ...DEFAULT_STATS },
-    relationships: { ...DEFAULT_RELATIONSHIPS, ...(rawSave.relationships ?? {}) },
+    stats: normalizeStoredStats(rawSave.stats ?? { ...DEFAULT_STATS }),
+    relationships: normalizeStoredRelationships({ ...DEFAULT_RELATIONSHIPS, ...(rawSave.relationships ?? {}) }),
     communication: {
       homeFriends: { ...DEFAULT_COMMUNICATION.homeFriends, ...(rawSave.communication?.homeFriends ?? {}) },
       mina: { ...DEFAULT_COMMUNICATION.mina, ...(rawSave.communication?.mina ?? {}) },
@@ -920,7 +942,8 @@ export function normalizeSave(rawSave: SaveData): SaveData {
 
   return {
     ...baseSave,
-    relationships: migratedRelationships
+    relationships: normalizeStoredRelationships(migratedRelationships),
+    stats: normalizeStoredStats(baseSave.stats)
   };
 }
 

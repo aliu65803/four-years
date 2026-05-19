@@ -1461,7 +1461,7 @@ export const sceneDefinitionsById: Record<string, SceneDefinition> = {
       {
         id: "ask-for-broader-life",
         label: "Ask for a broader life",
-        description: "Tell him you want a future that feels inhabited, not only impressive.",
+        description: "Tell him you want a future that feels livable, not just impressive.",
         statEffects: { mental: 5, academics: 2, social: 1 },
         relationshipEffects: { professorAlden: 4 },
         nextFlavorPrompt: "The player pushes beyond prestige and asks for a life that still feels human."
